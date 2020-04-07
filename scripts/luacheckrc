@@ -1,0 +1,22 @@
+std = "lua53"
+quiet = 1
+codes = true
+
+-- line is too long (127 > 120)
+-- Unused local variable
+-- Unused argument
+-- Unused loop variable
+ignore = {"631", "211", "212", "213"}
+
+-- Setting an undefined global variable
+files["app/**/*.lua"].ignore = {"111"}
+files["examples/*.lua"].ignore = {"111"}
+
+-- accessing undefined variable
+files["lualib/utils/inifile.lua"].ignore = {"113"}
+
+-- Value assigned to a local variable is unused
+files["lualib/seri/MessagePack.lua"].ignore = {"311"}
+
+-- empty if branch
+files["lualib/mqtt/client.lua"].ignore = {"542"}

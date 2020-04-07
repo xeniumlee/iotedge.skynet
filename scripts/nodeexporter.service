@@ -1,0 +1,40 @@
+[Unit]
+Description=Node Exporter
+Wants=network.target
+After=network.target
+
+[Service]
+WorkingDirectory=WORKING_DIR
+# cpu filesystem loadavg meminfo netclass netdev netstat thermal_zone time uname
+ExecStart=WORKING_DIR/bin/prebuilt/node_exporter \
+          --collector.systemd \
+          --collector.systemd.unit-whitelist="(systemd-timesyncd|iotedge|frpc).service" \
+          --no-collector.arp \
+          --no-collector.bcache \
+          --no-collector.bonding \
+          --no-collector.conntrack \
+          --no-collector.cpufreq \
+          --no-collector.diskstats \
+          --no-collector.edac \
+          --no-collector.entropy \
+          --no-collector.filefd \
+          --no-collector.hwmon \
+          --no-collector.infiniband \
+          --no-collector.ipvs \
+          --no-collector.mdadm \
+          --no-collector.nfs \
+          --no-collector.nfsd \
+          --no-collector.pressure \
+          --no-collector.rapl \
+          --no-collector.schedstat \
+          --no-collector.sockstat \
+          --no-collector.softnet \
+          --no-collector.stat \
+          --no-collector.timex \
+          --no-collector.vmstat \
+          --no-collector.xfs \
+          --no-collector.zfs
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

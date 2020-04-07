@@ -1,0 +1,13 @@
+/skynet/
+/bin/
+/release/
+/run/
+/db/
+/log*/
+/config.lua
+/log*
+
+*.a
+*.o
+*.so
+*.luac

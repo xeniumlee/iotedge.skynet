@@ -1,0 +1,77 @@
+{
+  "repo": {
+    "auth": "",
+    "uri": ""
+  },
+  "apps": [
+    {
+      "host_v_1_0_0": {}
+    },
+    {
+      "daq_modbus_v_1_0_0": {
+        "devices": {
+          "d1": {
+            "batch": 1,
+            "le": false,
+            "tags": {
+              "t1": {
+                "mode": "ts",
+                "addr": 0,
+                "dt": "uint",
+                "number": 2,
+                "bit": 1,
+                "cov": true,
+                "poll": 2000,
+                "offset": 0,
+                "gain": 1,
+                "le": true,
+                "fc": 3
+              }
+            },
+            "unitid": 1,
+            "attr_poll": 2000,
+            "ts_poll": 1000,
+            "retention": 1
+          }
+        },
+        "transport": {
+          "timeout": 500,
+          "le": false,
+          "ascii": false,
+          "tcp": {
+            "port": 30000,
+            "host": ""
+          },
+          "rtu": {
+            "parity": "none",
+            "rtscts": false,
+            "mode": "rs232",
+            "port": "",
+            "baudrate": 19200,
+            "b_timeout": 300,
+            "r_timeout": 300,
+            "stopbits": 1,
+            "databits": 8
+          },
+          "mode": "tcp"
+        }
+      }
+    }
+  ],
+  "pipes": [
+    {
+      "auto": true,
+      "apps": [
+        1,
+        "mqtt"
+      ]
+    },
+    {
+      "auto": false,
+      "apps": [
+        2,
+        "mqtt"
+      ]
+    }
+  ]
+}
