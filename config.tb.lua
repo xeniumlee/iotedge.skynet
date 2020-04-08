@@ -14,7 +14,7 @@ gateway = {
     audit = false
 }
 gateway_mqtt = {
-    tpl = "gateway_mqtt_tb",
+    tpl = 'gateway_mqtt_tb',
     id = 'MQTT_ID',
     uri = 'MQTT_URI',
     username = 'MQTT_USERNAME',
@@ -44,7 +44,7 @@ gateway_mqtt = {
             qos = 1,
             txt = 'v1/gatewayhub/attributes'
         },
-        gconfig = {
+        gattributes = {
             qos = 1,
             txt = 'v1/devicehub/attributes'
         },

@@ -1,5 +1,6 @@
 local skynet = require "skynet"
 local api = require "api"
+local sys = require "sys"
 local log = require "log"
 local seri = require "seri"
 local mqtt = require "mqtt"
@@ -11,7 +12,7 @@ local running = true
 local subsribe_ack_err_code = 128
 
 local sys_uri = ""
-local sys_name = ""
+local sys_id = ""
 local log_prefix = ""
 local cocurrency = 5
 local keepalive_timeout = 6000
@@ -28,29 +29,10 @@ local connect_topic = ""
 local connect_qos = 1
 local disconnect_topic = ""
 local disconnect_qos = 1
-local gconfig_topic = ""
-local gconfig_qos = 1
+local gattributes_topic = ""
+local gattributes_qos = 1
 local gtelemetry_topic = ""
 local gtelemetry_qos = 1
-
-local function init_topics(topic)
-    telemetry_topic = topic.telemetry.txt
-    telemetry_qos = topic.telemetry.qos
-    teleindication_topic = topic.teleindication.txt
-    teleindication_qos = topic.teleindication.qos
-    rpc_topic = topic.rpc.txt
-    rpc_qos = topic.rpc.qos
-    attributes_topic = topic.attributes.txt
-    attributes_qos = topic.attributes.qos
-    connect_topic = topic.connect.txt
-    connect_qos = topic.connect.qos
-    disconnect_topic = topic.disconnect.txt
-    disconnect_qos = topic.disconnect.qos
-    gconfig_topic = topic.gconfig.txt
-    gconfig_qos = topic.gconfig.qos
-    gtelemetry_topic = topic.gtelemetry.txt
-    gtelemetry_qos = topic.gtelemetry.qos
-end
 
 local reconnect_timeout = 200
 local sub_retry_count = 3
@@ -151,9 +133,9 @@ local function handle_connect(connack, cli)
     log.error(log_prefix, text.connect_suc)
 
     api.online()
-    api.sys_request("mqttapp", { uri = sys_uri, id = sys_name })
+    api.sys_request("mqttapp", { uri = sys_uri, id = sys_id })
     skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
-    skynet.fork(ensure_subscribe, cli, gconfig_topic, gconfig_qos)
+    skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
     skynet.fork(ping, cli)
 end
 
@@ -263,25 +245,53 @@ local function handle_rpc(msg, cli)
     end
 end
 
-local function list_to_kv(list, key)
-    for i, item in pairs(list) do
-        list[i] = { [item[key]] = item }
-    end
-end
-
 local function decode_config(msg)
     local conf = seri.unpack(msg.payload)
     if type(conf) ~= "table" then
         log.error(log_prefix, text.unpack_fail)
-        return false
+        error(text.unpack_fail)
     end
+    if type(conf.apps) == "table" then
+        local apps = conf.apps
+        local app_name, device_name, tag_name
+        for i, app in pairs(apps) do
+            app_name = string.format("%s_%s", app.app_name, app.app_version)
+            app.app_name = nil
+            app.app_version = nil
+            if type(app.devices) == "table" then
+                local devices = {}
+                for _, device in pairs(app.devices) do
+                    device_name = device.device_name
+                    device.device_name = nil
+                    if type(device.tags) == "table" then
+                        local tags = {}
+                        for _, tag in pairs(device.tags) do
+                            tag_name = tag.tag_name
+                            tag.tag_name = nil
+                            tags[tag_name] = tag
+                        end
+                        device.tags = tags
+                    end
+                    devices[device_name] = device
+                end
+                app.devices = devices
+            end
+            apps[i] = { [app_name] = app }
+        end
+        if type(conf.frp) == "table" then
+            apps.frp = { frp = conf.frp }
+            conf.frp = nil
+        end
+    end
+    return conf
 end
 
 local function handle_config(msg, cli)
     skynet.fork(function()
-        local conf = decode_config(msg)
-        if conf then
-            local ok, err = api.sys_request("configure", conf)
+        local ok, conf = pcall(decode_config, msg)
+        if ok and conf then
+            local err
+            ok, err = api.sys_request("configure", conf)
             if ok then
                 log.error(log_prefix, text.configure_suc)
             else
@@ -291,17 +301,36 @@ local function handle_config(msg, cli)
     end)
 end
 
-local handler_map = {
-    [rpc_topic] = handle_rpc,
-    [gconfig_topic] = handle_config
-}
+local handler_map = {}
+
+local function init_topics(topic)
+    telemetry_topic = topic.telemetry.txt
+    telemetry_qos = topic.telemetry.qos
+    teleindication_topic = topic.teleindication.txt
+    teleindication_qos = topic.teleindication.qos
+    rpc_topic = topic.rpc.txt
+    rpc_qos = topic.rpc.qos
+    attributes_topic = topic.attributes.txt
+    attributes_qos = topic.attributes.qos
+    connect_topic = topic.connect.txt
+    connect_qos = topic.connect.qos
+    disconnect_topic = topic.disconnect.txt
+    disconnect_qos = topic.disconnect.qos
+    gattributes_topic = topic.gattributes.txt
+    gattributes_qos = topic.gattributes.qos
+    gtelemetry_topic = topic.gtelemetry.txt
+    gtelemetry_qos = topic.gtelemetry.qos
+
+    handler_map[rpc_topic] = handle_rpc
+    handler_map[gattributes_topic] = handle_config
+end
 
 local function handle_request(msg, cli)
     cli:acknowledge(msg)
     if msg.dup then
         log.debug(log_prefix, text.dup_req, msg.topic)
     end
-    local h = handler_map(msg.topic)
+    local h = handler_map[msg.topic]
     if h then
         h(msg, cli)
     else
@@ -342,6 +371,10 @@ function command.data(dev, data)
     command.payload(dev, payload)
 end
 
+local attributes_map = {
+    [sys.infokey] = "edgeinfo"
+}
+
 local post_map = {
     online = function(dev)
         if type(dev) ~= "string" then
@@ -375,6 +408,22 @@ local post_map = {
         msg.payload = payload
         ensure_publish(client, msg)
     end,
+    teleindication = function(dev, data)
+        if type(dev) ~= "string" or type(data) ~= "table" then
+            log.error(log_prefix, text.invalid_post, "teleindication")
+            return
+        end
+        local payload = seri.pack({[dev] = data})
+        if not payload then
+            log.error(log_prefix, text.invalid_post, "teleindication")
+            return
+        end
+        local msg = {}
+        msg.topic = teleindication_topic
+        msg.qos = teleindication_qos
+        msg.payload = payload
+        ensure_publish(client, msg)
+    end,
     attributes = function(dev, attr)
         if type(dev) ~= "string" or type(attr) ~= "table" then
             log.error(log_prefix, text.invalid_post, "attributes")
@@ -388,6 +437,43 @@ local post_map = {
         local msg = {}
         msg.topic = attributes_topic
         msg.qos = attributes_qos
+        msg.payload = payload
+        ensure_publish(client, msg)
+    end,
+    gtelemetry = function(data)
+        if type(data) ~= "table" then
+            log.error(log_prefix, text.invalid_post, "gtelemetry")
+            return
+        end
+        local payload = seri.pack(data)
+        if not payload then
+            log.error(log_prefix, text.invalid_post, "gtelemetry")
+            return
+        end
+        local msg = {}
+        msg.topic = gtelemetry_topic
+        msg.qos = gtelemetry_qos
+        msg.payload = payload
+        ensure_publish(client, msg)
+    end,
+    gattributes = function(key, attr)
+        if type(key) ~= "string" or type(attr) ~= "table" then
+            log.error(log_prefix, text.invalid_post, "gattributes")
+            return
+        end
+        local k = attributes_map[key]
+        if not k then
+            log.error(log_prefix, text.invalid_post, "gattributes")
+            return
+        end
+        local payload = seri.pack({ [k] = seri.pack(attr) })
+        if not payload then
+            log.error(log_prefix, text.invalid_post, "gattributes")
+            return
+        end
+        local msg = {}
+        msg.topic = gattributes_topic
+        msg.qos = gattributes_qos
         msg.payload = payload
         ensure_publish(client, msg)
     end
@@ -411,7 +497,7 @@ local function init()
         math.randomseed(skynet.time())
 
         sys_uri = conf.uri
-        sys_name = conf.username
+        sys_id = conf.id
         log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
         cocurrency = conf.cocurrency
         keepalive_timeout = conf.keep_alive*100

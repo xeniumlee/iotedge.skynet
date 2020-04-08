@@ -41,9 +41,9 @@ local function fetch()
     end
 end
 
-local function run(host, tags)
+local function post_telemetry(tags)
     start()
-    local post = api.post_data
+    local post = api.post_gtelemetry
     while running do
         local data = {}
         local m = fetch()
@@ -63,8 +63,21 @@ local function run(host, tags)
                 end
             end
         end
-        post(host, data)
+        post(data)
         skynet.sleep(6000)
+    end
+end
+
+local function post_attributes()
+    local post = api.post_gattributes
+    local key = sys.infokey
+    while running do
+        local info = api.sys_request("info")
+        for _, app in pairs(info.apps) do
+            app.conf = nil
+        end
+        post(key, info)
+        skynet.sleep(30000)
     end
 end
 
@@ -76,13 +89,8 @@ function on_conf(cfg)
         tags[k] = v
     end
 
-    skynet.timeout(500, function()
-        local h = "iotedge-"..host
-        api.reg_dev(h, "iotedge")
-        api.batch_size(h, 1)
-        skynet.sleep(200)
-        run(h, tags)
-    end)
+    skynet.fork(post_telemetry, tags)
+    skynet.fork(post_attributes)
     return true
 end
 

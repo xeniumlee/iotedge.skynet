@@ -208,7 +208,7 @@ function api.post_cov(dev, data)
         data = filter_cov(dev, data)
         if next(data) then
             local p = api.pack_data(data)
-            do_post(dev, p)
+            send(gateway_mqtt_addr, "post", "teleindication", dev_name(dev, appname), p)
         end
     end
 end
@@ -222,6 +222,17 @@ function api.post_data(dev, data)
             do_post(dev, b)
             devlist[dev].buffer = {}
         end
+    end
+end
+function api.post_gtelemetry(data)
+    if type(data) == "table" and next(data) then
+        local p = api.pack_data(data)
+        send(gateway_mqtt_addr, "post", "gtelemetry", p)
+    end
+end
+function api.post_gattributes(key, attr)
+    if type(key) == "string" and type(attr) == "table" and next(attr) then
+        send(gateway_mqtt_addr, "post", "gattributes", key, attr)
     end
 end
 

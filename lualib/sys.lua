@@ -27,7 +27,8 @@ local sys = {
     pipe_cfg = "run/pipe",
     meta_lua = "meta",
     entry_lua = "entry",
-    gateway_global = "iotedge-gateway"
+    gateway_global = "iotedge-gateway",
+    infokey = "edgeinfo"
 }
 
 function sys.resolve(hostname)
