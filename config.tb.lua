@@ -34,7 +34,7 @@ gateway_mqtt = {
         },
         telemetry = {
             qos = 1,
-            txt = 'v1/gatewayhub/telemetry'
+            txt = 'v1/gatewayhub/telemetry/zip'
         },
         teleindication = {
             qos = 1,
@@ -50,7 +50,15 @@ gateway_mqtt = {
         },
         gtelemetry = {
             qos = 1,
-            txt = 'v1/devicehub/telemetry'
+            txt = 'v1/devicehub/telemetry/zip'
+        },
+        greq = {
+            qos = 1,
+            txt = 'v1/devicehub/rpc/request/+'
+        },
+        gresp = {
+            qos = 1,
+            txt = 'v1/devicehub/rpc/response'
         }
     },
     version = 'v3.1.1',

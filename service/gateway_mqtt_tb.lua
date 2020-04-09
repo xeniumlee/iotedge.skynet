@@ -33,6 +33,10 @@ local gattributes_topic = ""
 local gattributes_qos = 1
 local gtelemetry_topic = ""
 local gtelemetry_qos = 1
+local greq_topic = ""
+local greq_qos = 1
+local gresp_topic = ""
+local gresp_qos = 1
 
 local reconnect_timeout = 200
 local sub_retry_count = 3
@@ -136,6 +140,7 @@ local function handle_connect(connack, cli)
     api.sys_request("mqttapp", { uri = sys_uri, id = sys_id })
     skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
     skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
+    skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
     skynet.fork(ping, cli)
 end
 
@@ -149,21 +154,14 @@ local function handle_close(conn)
 end
 
 --[[
-msg = {
-    type=ptype,
-    dup=dup,
-    qos=qos,
-    retain=retain,
-    packet_id=packet_id,
-    topic=topic,
-    payload=payload
+payload = {
+    "device":"",
+    "data":{
+        "id": $request_id,
+        "method":"",
+        "params":{}
     }
-payload = {"device":"Device A",
-           "data":{
-             "id":$request_id,
-             "method":"toggle_gpio",
-             "params":{"pin":1}
-             }}
+  }
 --]]
 local function decode_rpc(msg)
     local request = seri.unpack(msg.payload)
@@ -190,10 +188,11 @@ local function decode_rpc(msg)
 end
 
 --[[
-payload = {"device":"Device A",
-           "id": $request_id,
-           "data":{"success": true}
-           }
+payload = {
+    "device":"",
+    "id": $request_id,
+    "data":{}
+  }
 --]]
 local function respond_rpc(cli, dev, ret, session)
     local response = {
@@ -301,6 +300,82 @@ local function handle_config(msg, cli)
     end)
 end
 
+local req_map = {
+    open_console = "frp",
+    open_ssh = "frp",
+    open_ws = "frp",
+    open_vpn = "frp",
+    open = "frp",
+    upgrade = "sys",
+    pipe_new = "sys",
+    pipe_remove = "sys"
+}
+
+--[[
+msg = {
+    topic=request_id
+    }
+payload = {
+    "method":"",
+    "params":{}
+    }
+--]]
+local function decode_req(msg)
+    local request = seri.unpack(msg.payload)
+    if type(request) ~= "table" then
+        log.error(log_prefix, text.unpack_fail)
+        return false
+    end
+    local dev = req_map[request.method]
+    if not dev then
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+    if type(request.params) ~= "table" then
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+    local session = msg.topic:match("^.+/([^/]+)$")
+    if math.tointeger(session) then
+        return dev, request.method, request.params, session
+    else
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+end
+
+local function respond_req(cli, ret, session)
+    local payload = seri.pack(ret)
+    if not payload then
+        log.error(log_prefix, text.pack_fail)
+        return
+    end
+    local msg = {}
+    msg.topic = gresp_topic.."/"..session
+    msg.qos = gresp_qos
+    msg.payload = payload
+    ensure_publish(cli, msg)
+end
+
+local function handle_req(msg, cli)
+    if busy_rpc() then
+        log.error(log_prefix, text.busy)
+    else
+        skynet.fork(function()
+            local dev, cmd, arg, session = decode_req(msg)
+            if dev then
+                local ok, ret = api.external_request(dev, cmd, arg)
+                if ret then
+                    respond_req(cli, { ok, ret }, session)
+                else
+                    respond_req(cli, ok, session)
+                end
+                done_rpc()
+            end
+        end)
+    end
+end
+
 local handler_map = {}
 
 local function init_topics(topic)
@@ -320,9 +395,14 @@ local function init_topics(topic)
     gattributes_qos = topic.gattributes.qos
     gtelemetry_topic = topic.gtelemetry.txt
     gtelemetry_qos = topic.gtelemetry.qos
+    greq_topic = topic.greq.txt
+    greq_qos = topic.greq.qos
+    gresp_topic = topic.gresp.txt
+    gresp_qos =  topic.gresp.qos
 
     handler_map[rpc_topic] = handle_rpc
     handler_map[gattributes_topic] = handle_config
+    handler_map[greq_topic] = handle_req
 end
 
 local function handle_request(msg, cli)
@@ -363,7 +443,7 @@ function command.data(dev, data)
         log.error(log_prefix, text.invalid_post, "telemetry")
         return
     end
-    local payload = seri.pack({[dev] = data})
+    local payload = seri.zpack({[dev] = data})
     if not payload then
         log.error(log_prefix, text.invalid_post, "telemetry")
         return
@@ -445,7 +525,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "gtelemetry")
             return
         end
-        local payload = seri.pack(data)
+        local payload = seri.zpack(data)
         if not payload then
             log.error(log_prefix, text.invalid_post, "gtelemetry")
             return
