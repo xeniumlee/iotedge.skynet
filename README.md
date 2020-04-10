@@ -21,9 +21,9 @@
 - [x] Kafka publisher
 - [x] MQTT publisher
 - [x] File publisher
-- [] HTTP data acquisition
-- [] OPCUA: Binding [open62541](https://open62541.org/)
-- [] BACnet: Binding [bacnet-stack](http://bacnet.sourceforge.net/)
+- [ ] HTTP data acquisition
+- [ ] OPCUA: Binding [open62541](https://open62541.org/)
+- [ ] BACnet: Binding [bacnet-stack](http://bacnet.sourceforge.net/)
 ## Build & Run
 ### Build
 * git clone https://github.com/cloudwu/skynet.git

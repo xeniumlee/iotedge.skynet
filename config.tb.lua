@@ -46,7 +46,7 @@ gateway_mqtt = {
         },
         gattributes = {
             qos = 1,
-            txt = 'v1/devicehub/attributes/zip'
+            txt = 'v1/devicehub/attributes'
         },
         gtelemetry = {
             qos = 1,
@@ -63,7 +63,7 @@ gateway_mqtt = {
     },
     version = 'v3.1.1',
     clean = true,
-    secure = false,
+    secure = true,
     keep_alive = 60,
     ping_limit = 3,
     seri = 'json',

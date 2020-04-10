@@ -8,14 +8,13 @@ local text = require("text").mqtt
 
 local client
 local running = true
-
 local subsribe_ack_err_code = 128
-
-local sys_uri = ""
-local sys_id = ""
 local log_prefix = ""
 local cocurrency = 5
 local keepalive_timeout = 6000
+
+local sys_uri = ""
+local sys_id = ""
 
 local telemetry_topic = ""
 local telemetry_qos = 1
@@ -36,16 +35,45 @@ local gtelemetry_qos = 1
 local gtelemetry_pack
 local gattributes_topic = ""
 local gattributes_qos = 1
-local gattributes_pack
 local greq_topic = ""
 local greq_qos = 1
 local gresp_topic = ""
 local gresp_qos = 1
 
-local reconnect_timeout = 200
 local sub_retry_count = 3
 local sub_retry_timeout = 200
 
+local function ensure_subscribe(cli, topic, qos)
+    local done = false
+    local count = 0
+
+    local function suback(ack)
+        if ack.rc[1] ~= subsribe_ack_err_code then
+            -- Strictly rc[1] >= qos
+            done = true
+            log.error(log_prefix, text.sub_suc, topic)
+        else
+            log.error(log_prefix, text.sub_fail, topic)
+        end
+    end
+    while running and not done do
+        if count < sub_retry_count then
+            if cli.connection then
+                cli:subscribe {
+                    topic = topic,
+                    qos = qos,
+                    callback = suback
+                }
+            end
+            count = count + 1
+            skynet.sleep(sub_retry_timeout)
+        else
+            log.error(log_prefix, text.sub_fail, topic)
+        end
+    end
+end
+
+local reconnect_timeout = 200
 local pub_retry_count
 local pub_retry_timeout = 2000
 
@@ -81,40 +109,11 @@ local function ensure_publish(cli, msg, dev)
         else
             -- only store due to connection issue
             if not cli.connection and dev then
-                api.store(dev, msg.payload)
+                local data = seri.pack(msg)
+                api.store(dev, data)
             else
                 log.error(log_prefix, text.pub_fail, msg.topic)
             end
-        end
-    end
-end
-
-local function ensure_subscribe(cli, topic, qos)
-    local done = false
-    local count = 0
-
-    local function suback(ack)
-        if ack.rc[1] ~= subsribe_ack_err_code then
-            -- Strictly rc[1] >= qos
-            done = true
-            log.error(log_prefix, text.sub_suc, topic)
-        else
-            log.error(log_prefix, text.sub_fail, topic)
-        end
-    end
-    while running and not done do
-        if count < sub_retry_count then
-            if cli.connection then
-                cli:subscribe {
-                    topic = topic,
-                    qos = qos,
-                    callback = suback
-                }
-            end
-            count = count + 1
-            skynet.sleep(sub_retry_timeout)
-        else
-            log.error(log_prefix, text.sub_fail, topic)
         end
     end
 end
@@ -134,20 +133,6 @@ local function handle_pinglimit(count, cli)
     cli:disconnect()
 end
 
-local function handle_connect(connack, cli)
-    if connack.rc ~= 0 then
-        return
-    end
-    log.error(log_prefix, text.connect_suc)
-
-    api.online()
-    api.sys_request("mqttapp", { uri = sys_uri, id = sys_id })
-    skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
-    skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
-    skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
-    skynet.fork(ping, cli)
-end
-
 local function handle_error(err)
     log.error(log_prefix, text.error, err)
 end
@@ -155,6 +140,21 @@ end
 local function handle_close(conn)
     api.offline()
     log.error(log_prefix, text.close, conn.close_reason)
+end
+
+local function handle_connect(connack, cli)
+    if connack.rc ~= 0 then
+        return
+    end
+    log.error(log_prefix, text.connect_suc)
+
+    api.online()
+    skynet.fork(ping, cli)
+
+    api.sys_request("mqttapp", { uri = sys_uri, id = sys_id })
+    skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
+    skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
+    skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
 end
 
 --[[
@@ -417,7 +417,6 @@ local function init_topics(topic)
 
     gattributes_topic = topic.gattributes.txt
     gattributes_qos = topic.gattributes.qos
-    gattributes_pack = init_seri(gattributes_topic)
 
     greq_topic = topic.greq.txt
     greq_qos = topic.greq.qos
@@ -455,11 +454,8 @@ function command.stop()
     end
 end
 
-function command.payload(dev, payload)
-    local msg = {}
-    msg.topic = telemetry_topic
-    msg.qos = telemetry_qos
-    msg.payload = payload
+function command.payload(dev, data)
+    local msg = seri.unpack(data)
     ensure_publish(client, msg, dev)
 end
 
@@ -473,7 +469,11 @@ function command.data(dev, data)
         log.error(log_prefix, text.invalid_post, "telemetry")
         return
     end
-    command.payload(dev, payload)
+    local msg = {}
+    msg.topic = telemetry_topic
+    msg.qos = telemetry_qos
+    msg.payload = payload
+    ensure_publish(client, msg, dev)
 end
 
 local attributes_map = {
@@ -571,7 +571,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
         end
-        local payload = gattributes_pack({ [k] = seri.pack(attr) })
+        local payload = seri.pack({ [k] = seri.pack(attr) })
         if not payload then
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
@@ -598,23 +598,18 @@ local function init()
     if not conf then
         log.error(text.no_conf)
     else
-        api.mqtt_init()
         math.randomseed(skynet.time())
-
-        sys_uri = conf.uri
-        sys_id = conf.id
         log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
-        cocurrency = conf.cocurrency
         keepalive_timeout = conf.keep_alive*100
-
-        init_topics(conf.topic)
         seri.init(conf.seri)
         init_pub_retry_count(keepalive_timeout, conf.ping_limit)
 
-        local version_map = {
-            ["v3.1.1"] = mqtt.v311,
-            ["v5.0"] = mqtt.v50
-        }
+        api.mqtt_init()
+        init_topics(conf.topic)
+        sys_uri = conf.uri
+        sys_id = conf.id
+        cocurrency = conf.cocurrency
+
         client = mqtt.client {
             uri = conf.uri,
             id = conf.id,
@@ -623,7 +618,7 @@ local function init()
             clean = conf.clean,
             secure = conf.secure,
             keep_alive = conf.keep_alive,
-            version = version_map[conf.version],
+            version = conf.version == "v3.1.1" and mqtt.v311 or mqtt.v50,
             ping_limit = conf.ping_limit
         }
         local mqtt_callback = {

@@ -6,7 +6,7 @@ conf = {
     topic = {
         telemetry = {
             qos = 1,
-            txt = 'telemetry',
+            txt = 'telemetry/zip',
         },
     },
     version = 'v3.1.1',

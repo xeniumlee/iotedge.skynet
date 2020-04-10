@@ -5,19 +5,18 @@ local seri = require "seri"
 local mqtt = require "mqtt"
 local text = require("text").mqtt
 
-local subsribe_ack_err_code = 128
-
 local client
 local running = true
-
+local subsribe_ack_err_code = 128
 local log_prefix = ""
 local keepalive_timeout = 6000
-local telemetry_topic = ""
-local telemetry_qos = 1
-
 local reconnect_timeout = 200
 local pub_retry_count
 local pub_retry_timeout = 2000
+
+local telemetry_topic = ""
+local telemetry_qos = 1
+local telemetry_pack
 
 local function init_pub_retry_count(keepalive, pinglimit)
     -- retry till connection issue detected
@@ -32,7 +31,7 @@ local function ensure_publish(cli, msg, dev)
 
     local function puback()
         done = true
-        log.debug(log_prefix, "published to", msg.topic, "QoS", msg.qos)
+        log.debug(log_prefix, text.pub_suc, msg.topic)
     end
     while running and not done do
         if count < pub_retry_count then
@@ -51,9 +50,10 @@ local function ensure_publish(cli, msg, dev)
         else
             -- only store due to connection issue
             if not cli.connection and dev then
-                api.store(dev, msg.payload)
+                local data = seri.pack(msg)
+                api.store(dev, data)
             else
-                log.error(log_prefix, "publish to", msg.topic, "failed")
+                log.error(log_prefix, text.pub_fail, msg.topic)
             end
         end
     end
@@ -70,45 +70,49 @@ local function ping(cli)
 end
 
 local function handle_pinglimit(count, cli)
-    log.error(log_prefix, text.conn_fail)
+    log.error(log_prefix, text.connect_fail)
     cli:disconnect()
+end
+
+local function handle_error(err)
+    log.error(log_prefix, text.error, err)
+end
+
+local function handle_close(conn)
+    api.offline()
+    log.error(log_prefix, text.close, conn.close_reason)
 end
 
 local function handle_connect(connack, cli)
     if connack.rc ~= 0 then
         return
     end
-    log.error(log_prefix, "connected")
+    log.error(log_prefix, text.connect_suc)
 
     api.online()
     skynet.fork(ping, cli)
 end
 
-local function handle_error(err)
-    log.error(log_prefix, "err:", err)
-end
-
-local function handle_close(conn)
-    api.offline()
-    log.error(log_prefix, "closed:", conn.close_reason)
+local function init_seri(topic)
+    if topic:match("^.+/zip$") then
+        return seri.zpack
+    else
+        return seri.pack
+    end
 end
 
 function on_conf(conf)
     math.randomseed(skynet.time())
-    api.enable_store()
-
     log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
     keepalive_timeout = conf.keep_alive*100
-    telemetry_topic = conf.topic.telemetry.txt
-    telemetry_qos = conf.topic.telemetry.qos
-
     seri.init(conf.seri)
     init_pub_retry_count(keepalive_timeout, conf.ping_limit)
 
-    local version_map = {
-        ["v3.1.1"] = mqtt.v311,
-        ["v5.0"] = mqtt.v50
-    }
+    api.enable_store()
+    telemetry_topic = conf.topic.telemetry.txt
+    telemetry_qos = conf.topic.telemetry.qos
+    telemetry_pack = init_seri(telemetry_topic)
+
     client = mqtt.client {
         uri = conf.uri,
         id = conf.id,
@@ -117,10 +121,9 @@ function on_conf(conf)
         clean = conf.clean,
         secure = conf.secure,
         keep_alive = conf.keep_alive,
-        version = version_map[conf.version],
+        version = conf.version == "v3.1.1" and mqtt.v311 or mqtt.v50,
         ping_limit = conf.ping_limit
     }
-
     local mqtt_callback = {
         connect = handle_connect,
         error = handle_error,
@@ -142,7 +145,21 @@ function on_conf(conf)
     return true
 end
 
-local function publish_payload(dev, payload)
+function on_payload(dev, data)
+    local msg = seri.unpack(data)
+    ensure_publish(client, msg, dev)
+end
+
+function on_data(dev, data)
+    if type(dev) ~= "string" or type(data) ~= "table" then
+        log.error(log_prefix, text.invalid_post, "telemetry")
+        return
+    end
+    local payload = telemetry_pack({[dev] = data})
+    if not payload then
+        log.error(log_prefix, text.invalid_post, "telemetry")
+        return
+    end
     local msg = {}
     msg.topic = telemetry_topic
     msg.qos = telemetry_qos
@@ -150,24 +167,7 @@ local function publish_payload(dev, payload)
     ensure_publish(client, msg, dev)
 end
 
-function on_payload(dev, payload)
-    publish_payload(dev, payload)
-end
-
-function on_data(dev, data)
-    if type(dev) ~= "string" or type(data) ~= "table" then
-        log.error(log_prefix, "telemetry publish failed")
-        return
-    end
-    local payload = seri.pack({[dev] = data})
-    if not payload then
-        log.error(log_prefix, "telemetry publish failed", text.pack_fail)
-        return
-    end
-    publish_payload(dev, payload)
-end
-
 function on_exit()
     running = false
-    client:close_connection(text.client_closed)
+    client:close_connection(text.close)
 end

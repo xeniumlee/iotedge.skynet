@@ -147,7 +147,7 @@ end
 local function validate_pipe_with_apps(pipe, apps)
     assert(type(pipe) == "table" and
         type(pipe.apps) == "table" and #(pipe.apps) > 1 and
-        (pipe.auto == "nil" or type(pipe.auto) == "boolean"),
+        (pipe.auto == nil or type(pipe.auto) == "boolean"),
         text.invalid_arg)
     for _, name in pairs(pipe.apps) do
         if sysapp(name) then
@@ -161,7 +161,7 @@ end
 local function validate_pipe(pipe)
     assert(type(pipe) == "table" and
         type(pipe.apps) == "table" and #(pipe.apps) > 1 and
-        (pipe.auto == "nil" or type(pipe.auto) == "boolean"),
+        (pipe.auto == nil or type(pipe.auto) == "boolean"),
         text.invalid_arg)
     local id
     for i, name in pairs(pipe.apps) do
