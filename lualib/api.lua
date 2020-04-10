@@ -208,7 +208,10 @@ function api.post_cov(dev, data)
         data = filter_cov(dev, data)
         if next(data) then
             local p = api.pack_data(data)
-            send(gateway_mqtt_addr, "post", "teleindication", dev_name(dev, appname), p)
+            if gateway_mqtt_addr then
+                send(gateway_mqtt_addr, "post", "teleindication", dev_name(dev, appname), p)
+            end
+            do_post(dev, p)
         end
     end
 end

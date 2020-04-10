@@ -29,6 +29,7 @@ local devlist = {}
 local cmd_desc = {
     read = "<tag>",
     write = "{<tag>,<val>}",
+    write_multi = "{ taglist = { {tag = <tag>, value = <val>} ... } }",
     list = "list tags"
 }
 
@@ -109,39 +110,66 @@ function read(dev, tag)
     end
 end
 
+local function do_write(dev, tag, value)
+    assert(devlist[dev].tags[tag], text.invalid_arg)
+    local vt = type(value)
+    assert(vt == "number" or vt == "boolean" or vt == "string", text.invalid_arg)
+
+    local u = devlist[dev].unitid
+    local t = devlist[dev].tags[tag]
+
+    assert(t.write, text.read_only)
+    local p = t.write(value)
+
+    local ok, ret = cli:request(u, p)
+    assert(ok, strfmt("%s:%s", text.req_fail, ret))
+    local uid = ret[1]
+    assert(uid==u, strfmt("%s:%s:%s", text.invalid_unit, u, uid))
+    local fc = ret[2]
+    assert(fc==t.wfc, strfmt("%s:%s:%s", text.invalid_fc, t.wfc, fc))
+    local addr = ret[3]
+    local data = ret[4]
+    assert(data ~= nil, strfmt("%s:%s", text.exception, addr))
+    assert(addr==t.addr, strfmt("%s:%s:%s", text.invalid_addr, t.addr, addr))
+    if fc == 5 or fc == 6 then
+        local v = t.unpack(1, {data})
+        assert(value==v, strfmt("%s:%s:%s", text.invalid_write, value, v))
+    else
+        assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
+    end
+end
+
 function write(dev, arg)
     if cli then
         return pcall(function()
             assert(devlist[dev], text.invalid_dev)
+            assert(type(arg) == "table", text.invalid_arg)
+            do_write(dev, arg[1], arg[2])
+        end)
+    else
+        return false, text.not_online
+    end
+end
+
+function write_multi(dev, arg)
+    if cli then
+        return pcall(function()
+            assert(devlist[dev], text.invalid_dev)
             assert(type(arg) == "table" and
-                type(arg[1]) == "string" and
-                (type(arg[2]) == "number" or
-                 type(arg[2]) == "boolean" or
-                 type(arg[2]) == "string"), text.invalid_arg)
-            assert(devlist[dev].tags[arg[1]], text.invalid_tag)
-            local u = devlist[dev].unitid
-            local t = devlist[dev].tags[arg[1]]
+                type(arg.taglist) == "table", text.invalid_arg)
 
-            assert(t.write, text.read_only)
-            local val = arg[2]
-            local p = t.write(val)
-
-            local ok, ret = cli:request(u, p)
-            assert(ok, strfmt("%s:%s", text.req_fail, ret))
-            local uid = ret[1]
-            assert(uid==u, strfmt("%s:%s:%s", text.invalid_unit, u, uid))
-            local fc = ret[2]
-            assert(fc==t.wfc, strfmt("%s:%s:%s", text.invalid_fc, t.wfc, fc))
-            local addr = ret[3]
-            local data = ret[4]
-            assert(data ~= nil, strfmt("%s:%s", text.exception, addr))
-            assert(addr==t.addr, strfmt("%s:%s:%s", text.invalid_addr, t.addr, addr))
-            if fc == 5 or fc == 6 then
-                local v = t.unpack(1, {data})
-                assert(val==v, strfmt("%s:%s:%s", text.invalid_write, val, v))
-            else
-                assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
+            local taglist = arg.taglist
+            local ok, err
+            for i, tag in pairs(taglist) do
+                assert(type(tag) == "table", text.invalid_arg)
+                ok, err = pcall(do_write, dev, tag.tag, tag.value)
+                if ok then
+                    taglist[i] = ok
+                else
+                    taglist[i] = { ok, err }
+                end
             end
+            return arg
         end)
     else
         return false, text.not_online
