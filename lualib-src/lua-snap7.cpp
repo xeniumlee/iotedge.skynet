@@ -44,6 +44,29 @@ namespace snap7 {
                 return std::make_tuple(false, CliErrorText(ret));
             }
         }
+        auto ReadMulti(const sol::table DataList) {
+            TS7DataItem items[MaxVars];
+            size_t count = DataList.size();
+            for(i = 1, j = 0, i <= count, i++, j++) {
+                items[j].Area = DataList[i]["area"];
+                items[j].DBNumber = DataList[i]["dbnumber"];
+                items[j].Start = DataList[i]["start"];
+                items[j].Amount = DataList[i]["amount"];
+                items[j].WordLen = DataList[i]["wordlen"];
+                size_t len = buffer_size(wordlen, amount);
+                items[j].pdata = malloc(len);
+            }
+
+            int ret = TS7Client::ReadMultiVars(&itmes[0], count);
+            if (ret == 0) {
+                std::string s(static_cast<const char*>(data), len);
+                free(data);
+                return std::make_tuple(true, s);
+            } else {
+                free(data);
+                return std::make_tuple(false, CliErrorText(ret));
+            }
+        }
         auto Write(const sol::table DataItem) {
             int area = DataItem["area"];
             int dbnumber = DataItem["dbnumber"];
