@@ -42,11 +42,11 @@ gateway_mqtt = {
         },
         attributes = {
             qos = 1,
-            txt = 'v1/gatewayhub/attributes'
+            txt = 'v1/gatewayhub/attributes/zip'
         },
         gattributes = {
             qos = 1,
-            txt = 'v1/devicehub/attributes'
+            txt = 'v1/devicehub/attributes/zip'
         },
         gtelemetry = {
             qos = 1,

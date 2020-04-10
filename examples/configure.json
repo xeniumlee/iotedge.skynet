@@ -1,40 +1,36 @@
 {
-  "apps": [
-    {
-      "daq_modbus_v_1_0_0_2": {
-        "devices": {
-          "d1": {
-            "batch": 1,
-            "le": false,
-            "unitid": 1,
-            "ts_poll": 1000,
-            "tags": {
-              "t1": {
-                "offset": 0,
-                "gain": 1,
-                "fc": 3,
-                "mode": "ts",
-                "poll": 2000,
-                "le": true,
-                "number": 2,
-                "bit": 1,
-                "dt": "uint",
-                "addr": 0,
-                "cov": true
-              },
-              "t2": {
-                "number": 4,
-                "dt": "uint",
-                "fc": 3,
-                "mode": "ts",
-                "addr": 2
-              }
-            },
-            "retention": 1,
-            "attr_poll": 2000
+  "daq_modbus_v_1_0_0_2": {
+    "devices": {
+      "d1": {
+        "batch": 1,
+        "le": false,
+        "unitid": 1,
+        "ts_poll": 1000,
+        "tags": {
+          "t1": {
+            "offset": 0,
+            "gain": 1,
+            "fc": 3,
+            "mode": "ts",
+            "poll": 2000,
+            "le": true,
+            "number": 2,
+            "bit": 1,
+            "dt": "uint",
+            "addr": 0,
+            "cov": true
+          },
+          "t2": {
+            "number": 4,
+            "dt": "uint",
+            "fc": 3,
+            "mode": "ts",
+            "addr": 2
           }
-        }
+        },
+        "retention": 1,
+        "attr_poll": 2000
       }
     }
-  ]
+  }
 }

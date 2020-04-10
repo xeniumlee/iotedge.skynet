@@ -3,9 +3,14 @@
     "auth": "",
     "uri": ""
   },
+  "frp": {
+    "server_addr": "",
+    "server_port": 7000,
+    "token": ""
+  },
   "apps": [
     {
-      "host_v_1_0_0": {}
+      "pub_mqtt_v_1_0_0": {}
     },
     {
       "daq_modbus_v_1_0_0": {
@@ -60,14 +65,14 @@
   ],
   "pipes": [
     {
-      "auto": true,
+      "auto": false,
       "apps": [
-        1,
-        "mqtt"
+        2,
+        1
       ]
     },
     {
-      "auto": false,
+      "auto": true,
       "apps": [
         2,
         "mqtt"

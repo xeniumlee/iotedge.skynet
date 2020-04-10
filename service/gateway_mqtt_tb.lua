@@ -19,20 +19,24 @@ local keepalive_timeout = 6000
 
 local telemetry_topic = ""
 local telemetry_qos = 1
+local telemetry_pack
+local attributes_topic = ""
+local attributes_qos = 1
+local attributes_pack
 local teleindication_topic = ""
 local teleindication_qos = 1
 local rpc_topic = ""
 local rpc_qos = 1
-local attributes_topic = ""
-local attributes_qos = 1
 local connect_topic = ""
 local connect_qos = 1
 local disconnect_topic = ""
 local disconnect_qos = 1
-local gattributes_topic = ""
-local gattributes_qos = 1
 local gtelemetry_topic = ""
 local gtelemetry_qos = 1
+local gtelemetry_pack
+local gattributes_topic = ""
+local gattributes_qos = 1
+local gattributes_pack
 local greq_topic = ""
 local greq_qos = 1
 local gresp_topic = ""
@@ -378,25 +382,46 @@ end
 
 local handler_map = {}
 
+local function init_seri(topic)
+    if topic:match("^.+/zip$") then
+        return seri.zpack
+    else
+        return seri.pack
+    end
+end
+
 local function init_topics(topic)
     telemetry_topic = topic.telemetry.txt
     telemetry_qos = topic.telemetry.qos
-    teleindication_topic = topic.teleindication.txt
-    teleindication_qos = topic.teleindication.qos
-    rpc_topic = topic.rpc.txt
-    rpc_qos = topic.rpc.qos
+    telemetry_pack = init_seri(telemetry_topic)
+
     attributes_topic = topic.attributes.txt
     attributes_qos = topic.attributes.qos
+    attributes_pack = init_seri(attributes_topic)
+
+    teleindication_topic = topic.teleindication.txt
+    teleindication_qos = topic.teleindication.qos
+
+    rpc_topic = topic.rpc.txt
+    rpc_qos = topic.rpc.qos
+
     connect_topic = topic.connect.txt
     connect_qos = topic.connect.qos
+
     disconnect_topic = topic.disconnect.txt
     disconnect_qos = topic.disconnect.qos
-    gattributes_topic = topic.gattributes.txt
-    gattributes_qos = topic.gattributes.qos
+
     gtelemetry_topic = topic.gtelemetry.txt
     gtelemetry_qos = topic.gtelemetry.qos
+    gtelemetry_pack = init_seri(gtelemetry_topic)
+
+    gattributes_topic = topic.gattributes.txt
+    gattributes_qos = topic.gattributes.qos
+    gattributes_pack = init_seri(gattributes_topic)
+
     greq_topic = topic.greq.txt
     greq_qos = topic.greq.qos
+
     gresp_topic = topic.gresp.txt
     gresp_qos =  topic.gresp.qos
 
@@ -443,7 +468,7 @@ function command.data(dev, data)
         log.error(log_prefix, text.invalid_post, "telemetry")
         return
     end
-    local payload = seri.zpack({[dev] = data})
+    local payload = telemetry_pack({[dev] = data})
     if not payload then
         log.error(log_prefix, text.invalid_post, "telemetry")
         return
@@ -509,7 +534,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "attributes")
             return
         end
-        local payload = seri.pack({[dev] = attr})
+        local payload = attributes_pack({[dev] = attr})
         if not payload then
             log.error(log_prefix, text.invalid_post, "attributes")
             return
@@ -525,7 +550,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "gtelemetry")
             return
         end
-        local payload = seri.zpack(data)
+        local payload = gtelemetry_pack(data)
         if not payload then
             log.error(log_prefix, text.invalid_post, "gtelemetry")
             return
@@ -546,7 +571,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
         end
-        local payload = seri.pack({ [k] = seri.pack(attr) })
+        local payload = gattributes_pack({ [k] = seri.pack(attr) })
         if not payload then
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
