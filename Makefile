@@ -5,6 +5,7 @@ CXXFLAGS=CXX17
 
 SKYNET_PATH = skynet
 LUA_SRC = $(SKYNET_PATH)/3rd/lua
+SKYNET_SRC = $(SKYNET_PATH)/skynet-src
 
 BUILD_PATH = bin
 PREBUILT_PATH = bin/prebuilt
@@ -48,7 +49,7 @@ LUA_SNAP7_BIN = $(BUILD_PATH)/snap7.so
 LUA_SNAP7_SRC = $(LUA_LIB_SRC)/lua-snap7.cpp
 LUA_SNAP7_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXXFLAGS)
 $(LUA_SNAP7_BIN): $(LUA_SNAP7_SRC) $(SNAP7_SRC)/snap7.cpp $(SNAP7_BIN)
-	$(LUA_SNAP7_CXX) $^ -o $@ -I$(LUA_SRC) -I$(SNAP7_SRC) -lpthread -lrt
+	$(LUA_SNAP7_CXX) $^ -o $@ -I$(LUA_SRC) -I$(SNAP7_SRC) -I$(SKYNET_SRC) -lpthread -lrt
 
 LUA_SERIAL_BIN = $(BUILD_PATH)/serial.so
 LUA_SERIAL_SRC = $(LUA_LIB_SRC)/lua-serial.cpp

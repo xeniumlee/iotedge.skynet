@@ -1,4 +1,5 @@
 #include "snap7.h"
+#include "skynet_malloc.h"
 #define SOL_ALL_SAFETIES_ON 1
 
 #ifdef CXX17
@@ -12,18 +13,18 @@ namespace snap7 {
     public:
         auto ConnectTo(const std::string& RemAddress, int Rack, int Slot) {
             int ret = TS7Client::ConnectTo(RemAddress.data(), Rack, Slot);
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Connect() {
             int ret = TS7Client::Connect();
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Disconnect() {
             int ret = TS7Client::Disconnect();
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Read(const sol::table DataItem) {
             int area = DataItem["area"];
@@ -32,40 +33,48 @@ namespace snap7 {
             int amount = DataItem["amount"];
             int wordlen = DataItem["wordlen"];
             size_t len = buffer_size(wordlen, amount);
-            void *data = malloc(len);
+            void *data = skynet_malloc(len);
 
             int ret = TS7Client::ReadArea(area, dbnumber, start, amount, wordlen, data);
             if (ret == 0) {
                 std::string s(static_cast<const char*>(data), len);
-                free(data);
-                return std::make_tuple(true, s);
+                skynet_free(data);
             } else {
-                free(data);
-                return std::make_tuple(false, CliErrorText(ret));
+                skynet_free(data);
             }
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
-        auto ReadMulti(const sol::table DataList) {
+        auto ReadMulti(sol::table DataList) {
             TS7DataItem items[MaxVars];
             size_t count = DataList.size();
-            for(i = 1, j = 0, i <= count, i++, j++) {
+            for(size_t i = 1, j = 0; j != count; i++, j++) {
                 items[j].Area = DataList[i]["area"];
                 items[j].DBNumber = DataList[i]["dbnumber"];
                 items[j].Start = DataList[i]["start"];
                 items[j].Amount = DataList[i]["amount"];
                 items[j].WordLen = DataList[i]["wordlen"];
-                size_t len = buffer_size(wordlen, amount);
-                items[j].pdata = malloc(len);
+                size_t len = buffer_size(items[j].WordLen, items[j].Amount);
+                DataList[i]["len"] = len;
+                items[j].pdata = skynet_malloc(len);
             }
 
-            int ret = TS7Client::ReadMultiVars(&itmes[0], count);
+            int ret = TS7Client::ReadMultiVars(&items[0], count);
             if (ret == 0) {
-                std::string s(static_cast<const char*>(data), len);
-                free(data);
-                return std::make_tuple(true, s);
+                void *data;
+                for(size_t i = 1, j = 0; j != count; i++, j++) {
+                    data = items[j].pdata;
+                    std::string s(static_cast<const char*>(data), DataList[i]["len"]);
+                    DataList[i]["value"] = s;
+                    skynet_free(data);
+                }
             } else {
-                free(data);
-                return std::make_tuple(false, CliErrorText(ret));
+                for(size_t j = 0; j != count; j++) {
+                    skynet_free(items[j].pdata);
+                }
             }
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Write(const sol::table DataItem) {
             int area = DataItem["area"];
@@ -77,8 +86,8 @@ namespace snap7 {
             void *data = const_cast<void*>(static_cast<const void*>(s.data()));
 
             int ret = TS7Client::WriteArea(area, dbnumber, start, amount, wordlen, data);
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Info(sol::this_state L) {
             sol::state_view lua(L);
@@ -92,8 +101,8 @@ namespace snap7 {
         }
         auto SetPDUSize(int Size) {
             int ret = TS7Client::SetParam(p_i32_PDURequest, &Size);
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
+            bool ok = (ret == 0);
+            return std::make_tuple(ok, CliErrorText(ret));
         }
         /*
         auto ClearPassword() {
@@ -148,6 +157,7 @@ namespace snap7 {
             "disconnect", &Cli::Disconnect,
             "connected", &Cli::Connected,
             "read", &Cli::Read,
+            "readmulti", &Cli::ReadMulti,
             "write", &Cli::Write,
             "info", &Cli::Info,
             "setpdusize", &Cli::SetPDUSize

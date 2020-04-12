@@ -75,6 +75,14 @@ function channel:read(dataitem)
     return self.__client:read(dataitem)
 end
 
+function channel:readmulti(datalist)
+    -- validate dataitem
+    if not block_connect(self, true) then
+        return false, socket_error
+    end
+    return self.__client:readmulti(datalist)
+end
+
 function channel:write(dataitem)
     -- validate dataitem
     if not block_connect(self, true) then

@@ -5,6 +5,7 @@ local client = require "s7.client"
 local cli
 local cmd_desc = {
     info = "Show info",
+    readmulti = "Read Multi",
     read = "{ db=<db>,addr=<addr>,amount=<a> }",
     write = "{ db=<db>,addr=<addr>,amount=<a>,value=<v> }",
 }
@@ -37,6 +38,35 @@ function read(arg)
     end
 end
 
+function readmulti(arg)
+    local list = {}
+    local item = {}
+    item.area = 0x84
+    item.dbnumber = 21
+    item.start = 0
+    item.amount = 1
+    item.wordlen = 0x02
+    table.insert(list, item)
+    local i = {}
+    i.area = 0x84
+    i.dbnumber = 103
+    i.start = 0
+    i.amount = 1
+    i.wordlen = 0x02
+    table.insert(list, i)
+
+    local ok, ret = cli:readmulti(list)
+    if ok then
+        print(list[1].value)
+        print(list[1].dbnumber)
+        print(list[2].value)
+        print(list[2].dbnumber)
+        return ok, ret
+    else
+        return ok, ret
+    end
+end
+
 function write(arg)
     local item = {}
     item.area = 0x84
@@ -56,4 +86,5 @@ end
 function on_conf(conf)
     cli = client.new(conf)
     reg_cmd()
+    return true
 end
