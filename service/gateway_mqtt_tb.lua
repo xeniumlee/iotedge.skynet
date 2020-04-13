@@ -486,7 +486,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "online")
             return
         end
-        local payload = seri.pack({device = dev})
+        local payload = seri.pack({ device = dev })
         if not payload then
             log.error(log_prefix, text.invalid_post, "online")
             return
@@ -502,7 +502,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "offline")
             return
         end
-        local payload = seri.pack({device = dev})
+        local payload = seri.pack({ device = dev })
         if not payload then
             log.error(log_prefix, text.invalid_post, "offline")
             return
@@ -518,7 +518,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "teleindication")
             return
         end
-        local payload = seri.pack({[dev] = data})
+        local payload = seri.pack({ [dev] = data })
         if not payload then
             log.error(log_prefix, text.invalid_post, "teleindication")
             return
@@ -534,7 +534,7 @@ local post_map = {
             log.error(log_prefix, text.invalid_post, "attributes")
             return
         end
-        local payload = attributes_pack({[dev] = attr})
+        local payload = attributes_pack({ [dev] = attr })
         if not payload then
             log.error(log_prefix, text.invalid_post, "attributes")
             return
@@ -545,7 +545,7 @@ local post_map = {
         msg.payload = payload
         ensure_publish(client, msg)
     end,
-    gtelemetry = function(data)
+    gtelemetry = function(_dev, data)
         if type(data) ~= "table" then
             log.error(log_prefix, text.invalid_post, "gtelemetry")
             return
@@ -561,17 +561,18 @@ local post_map = {
         msg.payload = payload
         ensure_publish(client, msg)
     end,
-    gattributes = function(key, attr)
-        if type(key) ~= "string" or type(attr) ~= "table" then
+    gattributes = function(_dev, attr)
+        if type(attr) ~= "table" then
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
         end
+        local key, value = next(attr)
         local k = attributes_map[key]
-        if not k then
+        if not k or type(value) ~= "table" then
             log.error(log_prefix, text.invalid_post, "gattributes")
             return
         end
-        local payload = seri.pack({ [k] = seri.pack(attr) })
+        local payload = seri.pack({ [k] = seri.pack(value) })
         if not payload then
             log.error(log_prefix, text.invalid_post, "gattributes")
             return

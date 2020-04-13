@@ -252,7 +252,7 @@ local function load_app(id, tpl)
     applist[id] = {}
 
     local name = sysapp(id) and id or tpl.."_"..id
-    local ok, addr = pcall(skynet.newservice, "appcell", tpl, name, mqttapp_addr)
+    local ok, addr = pcall(skynet.newservice, "appcell", tpl, name)
     if ok then
         applist[id] = {
             name = name,
@@ -276,10 +276,14 @@ end
 
 local function start_pipe(id)
     local apps = pipelist[id].apps
-    for _, appid in pairs(apps) do
+    for i, appid in ipairs(apps) do
         local r = applist[appid].route[id]
         if r.target then
-            skynet.send(applist[appid].addr, "lua", "route_add", r.source, r.target)
+            if i == 1 then
+                skynet.send(applist[appid].addr, "lua", "route_add", r.source, r.target, r.last)
+            else
+                skynet.send(applist[appid].addr, "lua", "route_add", r.source, r.target)
+            end
         end
     end
     pipelist[id].start_time = api.datetime()
@@ -289,10 +293,14 @@ end
 
 local function stop_pipe(id)
     local apps = pipelist[id].apps
-    for _, appid in pairs(apps) do
+    for i, appid in ipairs(apps) do
         local r = applist[appid].route[id]
         if r.target then
-            skynet.send(applist[appid].addr, "lua", "route_del", r.source, r.target)
+            if i == 1 then
+                skynet.send(applist[appid].addr, "lua", "route_del", r.source, r.target, r.last)
+            else
+                skynet.send(applist[appid].addr, "lua", "route_del", r.source, r.target)
+            end
         end
     end
     pipelist[id].start_time = false
@@ -308,13 +316,22 @@ end
 
 local function load_pipe(id, apps)
     local source = apps[1]
+    local lastid = apps[#apps]
     for i, appid in ipairs(apps) do
         local nextid = apps[i+1]
         if nextid then
-            applist[appid].route[id] = {
-                source = source,
-                target = applist[nextid].addr
-            }
+            if i == 1 then
+                applist[appid].route[id] = {
+                    source = source,
+                    target = applist[nextid].addr,
+                    last = applist[lastid].addr
+                }
+            else
+                applist[appid].route[id] = {
+                    source = source,
+                    target = applist[nextid].addr
+                }
+            end
         else
             applist[appid].route[id] = {
                 source = source

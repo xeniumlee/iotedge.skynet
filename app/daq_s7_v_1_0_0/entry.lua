@@ -57,10 +57,6 @@ function readmulti(arg)
 
     local ok, ret = cli:readmulti(list)
     if ok then
-        print(list[1].value)
-        print(list[1].dbnumber)
-        print(list[2].value)
-        print(list[2].dbnumber)
         return ok, ret
     else
         return ok, ret

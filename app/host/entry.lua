@@ -69,14 +69,14 @@ local function post_telemetry(tags)
 end
 
 local function post_attributes()
-    local post = api.post_gattributes
+    local post = api.post_gattr
     local key = sys.infokey
     while running do
         local info = api.sys_request("info")
         for _, app in pairs(info.apps) do
             app.conf = nil
         end
-        post(key, info)
+        post({ [key] = info })
         skynet.sleep(30000)
     end
 end

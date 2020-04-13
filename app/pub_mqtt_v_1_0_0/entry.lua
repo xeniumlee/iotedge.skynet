@@ -101,6 +101,28 @@ local function init_seri(topic)
     end
 end
 
+local function do_publish(dev, data)
+    if type(dev) ~= "string" or type(data) ~= "table" then
+        log.error(log_prefix, text.invalid_post)
+        return
+    end
+    local payload = telemetry_pack({ [dev] = data })
+    if not payload then
+        log.error(log_prefix, text.invalid_post)
+        return
+    end
+    local msg = {}
+    msg.topic = telemetry_topic
+    msg.qos = telemetry_qos
+    msg.payload = payload
+    ensure_publish(client, msg)
+end
+
+local post_map = {
+    teleindication = do_publish,
+    attributes = do_publish
+}
+
 function on_conf(conf)
     math.randomseed(skynet.time())
     log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
@@ -145,26 +167,22 @@ function on_conf(conf)
     return true
 end
 
+function on_post(t, dev, data)
+    local f = post_map[t]
+    if f then
+        f(dev, data)
+    else
+        log.error(log_prefix, text.invalid_post)
+    end
+end
+
 function on_payload(dev, data)
     local msg = seri.unpack(data)
     ensure_publish(client, msg, dev)
 end
 
 function on_data(dev, data)
-    if type(dev) ~= "string" or type(data) ~= "table" then
-        log.error(log_prefix, text.invalid_post, "telemetry")
-        return
-    end
-    local payload = telemetry_pack({[dev] = data})
-    if not payload then
-        log.error(log_prefix, text.invalid_post, "telemetry")
-        return
-    end
-    local msg = {}
-    msg.topic = telemetry_topic
-    msg.qos = telemetry_qos
-    msg.payload = payload
-    ensure_publish(client, msg, dev)
+    do_publish(dev, data)
 end
 
 function on_exit()

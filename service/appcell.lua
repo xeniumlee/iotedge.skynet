@@ -3,7 +3,7 @@ local api = require "api"
 local log = require "log"
 local text = require("text").app
 
-local tpl, name, gateway_mqtt_addr = ...
+local tpl, name = ...
 local command = {}
 
 local memlimit = require("sys").memlimit()
@@ -18,12 +18,12 @@ local function load_app()
     --cache.mode("ON")
 end
 
-function command.route_add(s, t)
-    api.route_add(s, t)
+function command.route_add(...)
+    api.route_add(...)
 end
 
-function command.route_del(s, t)
-    api.route_del(s, t)
+function command.route_del(...)
+    api.route_del(...)
 end
 
 setmetatable(command, { __index = function(t, cmd)
@@ -48,6 +48,11 @@ setmetatable(command, { __index = function(t, cmd)
         local payload_f = _ENV.on_payload
         if type(payload_f) == "function" then
             f = payload_f
+        end
+    elseif cmd == "post" then
+        local post_f = _ENV.on_post
+        if type(post_f) == "function" then
+            f = post_f
         end
     elseif cmd == "exit" then
         local exit_f = _ENV.on_exit
@@ -86,7 +91,7 @@ end})
 
 skynet.start(function()
     load_app()
-    api.app_init(name, gateway_mqtt_addr)
+    api.app_init(name)
     skynet.dispatch("lua", function(_, _, cmd, ...)
         command[cmd](...)
     end)
