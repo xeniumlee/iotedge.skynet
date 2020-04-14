@@ -44,14 +44,21 @@ if [ -n "${PLAT}" ]; then
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
-        DIRS="${INFO} bin config.*.lua scripts skynet.config*"
-        EXCLUDES="--exclude=gate.so \
-                  --exclude=sproto.so \
-                  --exclude=client.so \
-                  --exclude=lib* \
-                  --exclude=*.lua"
+        DIRS="${INFO} bin config.*.lua \
+              scripts/*.service \
+              scripts/install.sh \
+              scripts/uninstall.sh \
+              scripts/upgrade.sh \
+              iotedge.config.prod"
 
-        tar --transform "s|^|iotedge-${REV}/|" ${EXCLUDES} -czf ${TARBALL} ${DIRS} ${LUADIRS}
+        tar --transform="s|bin/skynet$|bin/iotedge|" \
+            --transform="s|^|iotedge-${REV}/|" \
+            --exclude=gate.so \
+            --exclude=sproto.so \
+            --exclude=client.so \
+            --exclude=lib* \
+            --exclude=*.lua \
+            -czf ${TARBALL} ${DIRS} ${LUADIRS}
         find . -name "*.luac" |xargs rm -f
         rm -f ${INFO}
 
@@ -64,8 +71,7 @@ if [ -n "${PLAT}" ]; then
                 compile ${APP}
 
                 TARBALL=${RELEASE_DIR}/v_${BASE#*_v_}.tar.gz
-                EXCLUDES="--exclude=*.lua"
-                tar ${EXCLUDES} -czf ${TARBALL} ${APP}
+                tar --exclude=*.lua -czf ${TARBALL} ${APP}
                 find . -name "*.luac" |xargs rm -f
 
                 echo "${TARBALL} created"

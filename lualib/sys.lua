@@ -45,8 +45,12 @@ function sys.resolve(hostname)
 end
 
 function sys.quit()
-    skynet.abort()
-    --execute(uninstall_cmd)
+    local dev = skynet.getenv("loglevel"):match("DEBUG")
+    if dev then
+        skynet.abort()
+    else
+        execute(uninstall_cmd)
+    end
 end
 function sys.unzip(f, dir)
     if not dir then
