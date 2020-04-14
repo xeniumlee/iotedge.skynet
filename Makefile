@@ -1,8 +1,3 @@
-CXXSTD=c++17
-CXXFLAGS=CXX17
-#CXXSTD=c++14
-#CXXFLAGS=CXX14
-
 SKYNET_PATH = skynet
 LUA_SRC = $(SKYNET_PATH)/3rd/lua
 SKYNET_SRC = $(SKYNET_PATH)/skynet-src
@@ -13,6 +8,14 @@ LUA_LIB_SRC = lualib-src
 
 OS = linux
 CC = gcc
+GCCVERSION = $(shell gcc -dumpversion |cut -f1 -d.)
+ifeq ($(GCCVERSION), 8)
+	CXXSTD = c++17
+	CXXFLAGS = CXX17
+else
+	CXXSTD = c++14
+	CXXFLAGS = CXX14
+endif
 
 .PHONY: skynet
 

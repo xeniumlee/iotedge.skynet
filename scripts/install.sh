@@ -16,7 +16,7 @@ REVPLAT=$(cat PLATFORM)
 REV=${REVPLAT%-*}
 PLAT=${REVPLAT#*-}
 
-if [ ${CONFIG} = "config.tb.lua" ]; then
+if [ ${CONFIG} = "config.tb" ]; then
     if [ -z "${HOST}" ] || \
        [ -z "${NAME}" ] || \
        [ -z "${TOKEN}" ] || \
@@ -32,12 +32,12 @@ if [ ${CONFIG} = "config.tb.lua" ]; then
             s|MQTT_USERNAME|${TOKEN}|; \
             s|MQTT_PASSWORD||; \
             s|MQTT_URI|${URI}|" ${CONFIG}
-elif [ ${CONFIG} = "config.local.lua" ]; then
+elif [ ${CONFIG} = "config.local" ]; then
     sed -i "s|SYS_VERSION|${REV}|; \
             s|SYS_PLAT|${PLAT}|" ${CONFIG}
 fi
 
-sed -i "s|config.lua|${CONFIG}|" skynet.config.prod
+sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
     UNIT_FILE=/etc/systemd/system/$2
@@ -54,5 +54,5 @@ install ${NODE_SERVICE} ${NODE_SERVICE}
 install ${FRP_SERVICE} ${FRP_SERVICE}
 
 systemctl daemon-reload
-#systemctl enable ${CORE_SERVICE}
+systemctl enable ${CORE_SERVICE}
 systemctl restart ${CORE_SERVICE}

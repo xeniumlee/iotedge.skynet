@@ -44,8 +44,9 @@ if [ -n "${PLAT}" ]; then
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
-        DIRS="${INFO} bin config.*.lua \
+        DIRS="${INFO} bin config.* \
               scripts/*.service \
+              scripts/prepare.sh \
               scripts/install.sh \
               scripts/uninstall.sh \
               scripts/upgrade.sh \
@@ -57,6 +58,7 @@ if [ -n "${PLAT}" ]; then
             --exclude=sproto.so \
             --exclude=client.so \
             --exclude=lib* \
+            --exclude=s7server \
             --exclude=*.lua \
             -czf ${TARBALL} ${DIRS} ${LUADIRS}
         find . -name "*.luac" |xargs rm -f

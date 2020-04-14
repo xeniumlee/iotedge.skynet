@@ -64,7 +64,7 @@ namespace snap7 {
                 void *data;
                 for(size_t i = 1, j = 0; j != count; i++, j++) {
                     data = items[j].pdata;
-                    std::string s(static_cast<const char*>(data), DataList[i]["len"]);
+                    std::string s(static_cast<const char*>(data), static_cast<size_t>(DataList[i]["len"]));
                     DataList[i]["value"] = s;
                     skynet_free(data);
                 }

@@ -34,5 +34,5 @@ install ${NODE_SERVICE} ${NODE_SERVICE}
 install ${FRP_SERVICE} ${FRP_SERVICE}
 
 systemctl daemon-reload
-#systemctl enable ${CORE_SERVICE}
+systemctl enable ${CORE_SERVICE}
 systemctl restart ${CORE_SERVICE}

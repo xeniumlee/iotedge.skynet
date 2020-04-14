@@ -3,7 +3,7 @@ logservice = "snlua"
 logpath = "logs"
 loglevel = "ERROR"
 
-cfg = "config.lua"
+cfg = "config"
 
 harbor = 0
 start = "sysmgr"
