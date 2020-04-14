@@ -414,9 +414,9 @@ local cmd_desc = {
 
 local function launch()
     if sys.prod() then
-        skynet.sleep(6000) -- delayed for wanup
+        skynet.sleep(6000) -- delayed for wan up
     else
-        skynet.sleep(1) -- delayed for wanup
+        skynet.sleep(1) -- delayed for logger up
     end
 
     load_all()
