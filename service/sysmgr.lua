@@ -331,7 +331,7 @@ end
 
 function command.upgrade(version)
     local tarball = sys.app_tarball(version)
-    local tar = http.get(sys.app_uri(cfg.repo.uri, cfg.sys.platform)..tarball, cfg.repo.auth, 6000)
+    local tar = http.get(sys.app_uri(cfg.repo.uri, cfg.sys.platform)..tarball, cfg.repo.auth, 60000)
     if not tar then
         return false, text.download_fail
     end
