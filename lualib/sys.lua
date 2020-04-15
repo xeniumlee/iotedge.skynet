@@ -44,12 +44,19 @@ function sys.resolve(hostname)
     end
 end
 
-function sys.quit()
-    local dev = skynet.getenv("loglevel"):match("DEBUG")
-    if dev then
-        skynet.abort()
+function sys.prod()
+    if skynet.getenv("loglevel"):match("ERROR") then
+        return true
     else
+        return false
+    end
+end
+
+function sys.quit()
+    if sys.prod() then
         execute(uninstall_cmd)
+    else
+        skynet.abort()
     end
 end
 function sys.unzip(f, dir)

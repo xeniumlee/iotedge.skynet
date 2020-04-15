@@ -138,6 +138,7 @@ local function close_vpn_server()
 end
 
 local function init_conf(cfg)
+    frpcconf = ini.parse(frpcini)
     frpcconf.common.server_addr = cfg.server_addr
     frpcconf.common.server_port = cfg.server_port
     frpcconf.common.token = cfg.token

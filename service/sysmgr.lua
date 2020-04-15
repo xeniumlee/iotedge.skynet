@@ -413,7 +413,12 @@ local cmd_desc = {
 }
 
 local function launch()
-    skynet.sleep(1) -- wait for logger
+    if sys.prod() then
+        skynet.sleep(6000) -- delayed for wanup
+    else
+        skynet.sleep(1) -- delayed for wanup
+    end
+
     load_all()
     init_auth()
     log.error("System starting")
