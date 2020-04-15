@@ -379,7 +379,7 @@ function command.upgrade(version)
                 log.error(text.install_fail)
             end
 
-            skynet.sleep(500)
+            skynet.sleep(8000)
             local err
             ok, err = pcall(configure, t_port, c_total)
             if ok then

@@ -10,6 +10,10 @@ REV=${REVPLAT%-*}
 
 cp -f $DIR/${CONFIG} ./
 cp -rf $DIR/db ./
+if [ -f $DIR/run/frpc.ini ]; then
+    mkdir run
+    cp -f $DIR/run/frpc.ini ./run/
+fi
 
 sed -i "s|.*version.*|    version = '${REV}',|; \
         s|.*cluster.*|    cluster = ${PORT},|" ${CONFIG}
