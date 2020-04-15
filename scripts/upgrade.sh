@@ -13,7 +13,7 @@ cp -rf $DIR/db ./
 
 sed -i "s|.*version.*|    version = '${REV}',|; \
         s|.*cluster.*|    cluster = ${PORT},|" ${CONFIG}
-sed -i "s|config.lua|${CONFIG}|" skynet.config.prod
+sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
     UNIT_FILE=/etc/systemd/system/$2
