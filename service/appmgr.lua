@@ -52,7 +52,7 @@ local function make_pipeinfo(pipe)
     return info
 end
 
-local function info()
+local function refresh_info()
     local apps = {}
     local name
     for id, app in pairs(applist) do
@@ -65,18 +65,12 @@ local function info()
     end
     sysinfo.apps = apps
     sysinfo.pipes = pipes
-    sysinfo.sys.uptime = string.format("%d seconds", math.floor(skynet.now()/100))
-    return sysinfo
-end
-
-local function invalidate_info()
-    command.info = nil
 end
 
 local function update_app(id)
     local app = applist[id]
     api.internal_request("update_app", { id, app.tpl, app.conf })
-    invalidate_info()
+    refresh_info()
 end
 
 local function remove_app(id)
@@ -84,11 +78,11 @@ local function remove_app(id)
     skynet.send(app.addr, "lua", "exit")
     api.internal_request("update_app", { id, app.tpl, false })
     applist[id] = nil
-    invalidate_info()
+    refresh_info()
 end
 
 local function update_pipes()
-    invalidate_info()
+    refresh_info()
     local list = {}
     for k, v in pairs(pipelist) do
         list[k] = {}
@@ -464,6 +458,9 @@ local function load_all()
     sysinfo.sys.cluster = nil
     sysinfo.sys.up = api.datetime(skynet.starttime())
     sysinfo.sys.repo = false
+    sysinfo.apps = {}
+    sysinfo.pipes = {}
+
     tpllist = api.internal_request("conf_get", "tpls")
 
     load_sysapp()
@@ -478,6 +475,7 @@ local function load_all()
     else
         log.error(text.conf_fail, err)
     end
+    refresh_info()
 
     locked = false
 end
@@ -685,21 +683,10 @@ function command.pipe_stop(arg)
     return true
 end
 
-setmetatable(command, { __index = function(t, cmd)
-    local f
-    if cmd == "info" then
-        local i = info()
-        f = function()
-            return i
-        end
-    else
-        f = function()
-            return false, text.unknown_cmd
-        end
-    end
-    t[cmd] = f
-    return f
-end})
+function command.info()
+    sysinfo.sys.uptime = string.format("%d seconds", math.floor(skynet.now()/100))
+    return sysinfo
+end
 
 local function signal(addr)
     core.command("SIGNAL", skynet.address(addr))
@@ -739,7 +726,12 @@ skynet.start(function()
     }
     skynet.timeout(interval, check)
     skynet.dispatch("lua", function(_, _, cmd, dev, arg)
-        skynet.ret(skynet.pack(command[cmd](arg)))
+        local f = command[cmd]
+        if f then
+            skynet.ret(skynet.pack(f(arg)))
+        else
+            skynet.ret(skynet.pack(false, text.unknown_cmd))
+        end
     end)
     skynet.fork(load_all)
 end)

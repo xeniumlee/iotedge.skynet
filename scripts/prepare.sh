@@ -48,8 +48,11 @@ systemctl stop rsyslog
 
 # Moxa
 if [ -f /usr/sbin/cell_mgmt ]; then
-    sed -i "/exit/i cell_mgmt start APN=internet" /etc/rc.local
+    sed -i "/^cell_mgmt/d; /exit/i cell_mgmt start APN=internet" /etc/rc.local
     chmod +x /etc/rc.local
+fi
+if [ -d /var/lib/docker ]; then
+    rm -rf /var/lib/docker
 fi
 
 # Clean
@@ -70,7 +73,7 @@ clean_svc rsync.service
 systemctl daemon-reload
 
 # Update
-apt-get update && sudo apt-get -y upgrade
+apt-get update && apt-get -y upgrade && apt-get -y install telnet rlwrap
 
 # Restart
 reboot
