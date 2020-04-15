@@ -343,8 +343,8 @@ end
 
 local function configure_app(id, conf, nosave)
     local a = applist[id]
-    local ok, err = skynet.call(a.addr, "lua", "conf", conf)
-    if ok then
+    local ok, ret, err = pcall(skynet.call, a.addr, "lua", "conf", conf)
+    if ok and ret then
         a.conf = conf
         if not nosave and not a.read_only then
             update_app(id)
