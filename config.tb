@@ -1,6 +1,6 @@
 sys = {
     id = 'SYS_ID',
-    version = 'SYS_VERSION',
+    release = 'SYS_VERSION',
     platform = 'SYS_PLAT',
     host = 'SYS_HOST',
     cluster = 30002

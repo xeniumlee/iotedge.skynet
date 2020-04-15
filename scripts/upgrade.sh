@@ -15,7 +15,7 @@ if [ -f $DIR/run/frpc.ini ]; then
     cp -f $DIR/run/frpc.ini ./run/
 fi
 
-sed -i "s|.*version.*|    version = '${REV}',|; \
+sed -i "s|.*release.*|    release = '${REV}',|; \
         s|.*cluster.*|    cluster = ${PORT},|" ${CONFIG}
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
