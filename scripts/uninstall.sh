@@ -1,7 +1,8 @@
 #!/bin/sh
 set -e
 
-REV=$(cat VERSION)
+REVPLAT=$(cat PLATFORM)
+REV=${REVPLAT%-*}
 UNIT=iotedge-${REV}.service
 UNIT_FILE=/etc/systemd/system/${UNIT}
 
