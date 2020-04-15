@@ -138,12 +138,15 @@ local function close_vpn_server()
 end
 
 local function init_conf(cfg)
-    frpcconf = ini.parse(frpcini)
+    local ok, conf = pcall(ini.parse, frpcini)
+    if ok then
+        frpcconf = conf
+    end
     frpcconf.common.server_addr = cfg.server_addr
     frpcconf.common.server_port = cfg.server_port
     frpcconf.common.token = cfg.token
     ini.save(frpcini, frpcconf)
-    local ok = start()
+    ok = start()
     if ok then
         reg_cmd()
     end
