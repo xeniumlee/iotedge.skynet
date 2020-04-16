@@ -346,14 +346,18 @@ end
 local function configure_app(id, conf, nosave)
     local a = applist[id]
     local ok, ret, err = pcall(skynet.call, a.addr, "lua", "conf", conf)
-    if ok and ret then
-        a.conf = conf
-        if not nosave and not a.read_only then
-            update_app(id)
+    if ok then
+        if ret then
+            a.conf = conf
+            if not nosave and not a.read_only then
+                update_app(id)
+            end
+            return ret
+        else
+            return ret, err
         end
-        return ok
     else
-        return ok, err
+        return ok, ret
     end
 end
 
