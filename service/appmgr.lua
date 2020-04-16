@@ -85,9 +85,11 @@ local function update_pipes()
     refresh_info()
     local list = {}
     for k, v in pairs(pipelist) do
-        list[k] = {}
-        list[k].auto = (v.start_time ~= false)
-        list[k].apps = v.apps
+        if not syspipe(k) then
+            list[k] = {}
+            list[k].auto = (v.start_time ~= false)
+            list[k].apps = v.apps
+        end
     end
     api.internal_request("update_pipes", list)
 end
