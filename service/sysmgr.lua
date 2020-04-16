@@ -252,7 +252,7 @@ end
 
 function command.install_tpl(name)
     local tarball = sys.app_tarball(name)
-    local tar = http.get(sys.app_uri(cfg.repo.uri, cfg.sys.platform, name)..tarball, cfg.repo.auth)
+    local tar = http.get(sys.app_uri(cfg.repo.uri, cfg.sys.platform, name)..tarball, cfg.repo.auth, 6000)
     if not tar then
         return false, text.download_fail
     end

@@ -33,9 +33,9 @@
 * make all
 ### Run
 * Put necessary dependences into bin/prebuilt
-* cp config.xx.lua config.lua
-* Edit config.lua
-* ./bin/skynet skynet.config
+* cp config.xx config
+* Edit config
+* ./bin/skynet iotedge.config
 * telnet localhost 30000
 * Type help
 ### Production
