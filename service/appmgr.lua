@@ -521,6 +521,7 @@ function command.configure(arg)
         ok, err = pcall(validate_fullconf, arg)
         if ok then
             command.clean()
+            skynet.sleep(3000)
             ok, err = configure_all(arg)
         end
     else

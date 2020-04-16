@@ -368,7 +368,7 @@ function command.upgrade(version)
             if cfg.gateway_mqtt then
                 skynet.send(cfg.gateway_mqtt_addr, "lua", "stop")
             end
-            skynet.sleep(500)
+            skynet.sleep(1000)
 
             lfs.chdir(t_dir)
             ok = sys.upgrade(c_dir, c_conf, t_port)
@@ -386,7 +386,7 @@ function command.upgrade(version)
                 log.error(text.configure_fail, err)
             end
 
-            skynet.sleep(100)
+            skynet.sleep(100) -- for log above msg
             sys.quit()
             end)
         return ok
