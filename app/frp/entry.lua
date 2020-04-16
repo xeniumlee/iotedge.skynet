@@ -270,5 +270,5 @@ function on_conf(cfg)
 end
 
 function on_exit()
-    stop()
+    --stop()
 end
