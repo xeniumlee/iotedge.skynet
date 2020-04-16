@@ -255,6 +255,11 @@ local function decode_config(msg)
         log.error(log_prefix, text.unpack_fail)
         error(text.unpack_fail)
     end
+    conf = seri.unpack(conf.configuration)
+    if type(conf) ~= "table" then
+        log.error(log_prefix, text.unpack_fail)
+        error(text.unpack_fail)
+    end
     log.debug(dump(conf))
     if type(conf.apps) == "table" then
         local apps = conf.apps
