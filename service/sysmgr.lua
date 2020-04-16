@@ -289,19 +289,13 @@ end
 function command.update_repo(arg)
     local uri = arg[1]
     local auth = arg[2]
-    local ok = http.get(uri, auth)
+    local conf = { uri = uri, auth = auth }
+    local ok, err = save_cfg(repo_cfg, "repo", conf)
     if ok then
-        local conf = { uri = uri, auth = auth }
-        local err
-        ok, err = save_cfg(repo_cfg, "repo", conf)
-        if ok then
-            cfg.repo = conf
-            return ok
-        else
-            return ok, err
-        end
+        cfg.repo = conf
+        return ok
     else
-        return false, text.invalid_auth
+        return ok, err
     end
 end
 

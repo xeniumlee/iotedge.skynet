@@ -53,7 +53,6 @@ local text = {
         config_removed = "config removed",
         config_update_suc = "config updated",
         config_update_fail = "config update failed",
-        invalid_auth = "invalid SW repository uri or auth",
         dup_tpl = "duplicate APP template",
         dup_app = "duplicate APP",
         download_fail = "SW download failed",
