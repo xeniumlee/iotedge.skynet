@@ -184,8 +184,12 @@ local command = {}
 function command.auth(arg)
     local username = arg[1]
     local password = arg[2]
-    return md5.sumhexa(username) == cfg.auth.username and
-    crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
+    if type(username) == "string" and type(password) == "string" then
+        return md5.sumhexa(username) == cfg.auth.username and
+        crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
+    else
+        return false
+    end
 end
 
 function command.update_app(arg)
