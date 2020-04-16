@@ -4,6 +4,7 @@ local sys = require "sys"
 local log = require "log"
 local seri = require "seri"
 local mqtt = require "mqtt"
+local dump = require "utils.dump"
 local text = require("text").mqtt
 
 local client
@@ -254,6 +255,7 @@ local function decode_config(msg)
         log.error(log_prefix, text.unpack_fail)
         error(text.unpack_fail)
     end
+    log.debug(dump(conf))
     if type(conf.apps) == "table" then
         local apps = conf.apps
         local app_name, device_name, tag_name
@@ -286,6 +288,7 @@ local function decode_config(msg)
             conf.frp = nil
         end
     end
+    log.debug(dump(conf))
     return conf
 end
 
