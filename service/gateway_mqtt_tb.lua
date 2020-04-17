@@ -236,6 +236,7 @@ local function handle_rpc(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_rpc(msg)
+            log.debug("rpc", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then

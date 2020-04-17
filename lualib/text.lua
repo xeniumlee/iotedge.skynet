@@ -44,7 +44,8 @@ local text = {
         invalid_fc = "invalid function code of response",
         invalid_addr = "invalid addr of response",
         invalid_write = "invalid write",
-        exception = "exception raised"
+        exception = "exception raised",
+        write_ok = "write done"
     },
     sysmgr = {
         unknown_cmd = "unknown command",

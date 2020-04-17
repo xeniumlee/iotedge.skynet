@@ -137,6 +137,7 @@ local function do_write(dev, tag, value)
     else
         assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
     end
+    log.error(text.write_ok, dev, tag, tostring(value))
 end
 
 function write(dev, arg)
