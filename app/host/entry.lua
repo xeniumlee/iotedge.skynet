@@ -96,5 +96,5 @@ end
 
 function on_exit()
     running = false
-    stop()
+    --stop()
 end

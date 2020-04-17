@@ -29,10 +29,6 @@ CORE_SERVICE=iotedge-${REV}.service
 NODE_SERVICE=nodeexporter.service
 FRP_SERVICE=frpc.service
 
-set +e
-systemctl stop ${NODE_SERVICE}
-systemctl stop ${FRP_SERVICE}
-set -e
 install iotedge.service ${CORE_SERVICE}
 install ${NODE_SERVICE} ${NODE_SERVICE}
 install ${FRP_SERVICE} ${FRP_SERVICE}
@@ -40,3 +36,5 @@ install ${FRP_SERVICE} ${FRP_SERVICE}
 systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}
 systemctl restart ${CORE_SERVICE}
+systemctl restart ${NODE_SERVICE}
+systemctl restart ${FRP_SERVICE}
