@@ -137,7 +137,7 @@ local function do_write(dev, tag, value)
     else
         assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
     end
-    log.error(text.write_ok, dev, tag, tostring(value))
+    log.error(text.write_suc, dev, tag, tostring(value))
 end
 
 function write(dev, arg)
@@ -255,7 +255,7 @@ local function make_poll(dname, unitid, fc, start, number, interval, index)
                 post(dname, index, interval)
             end)
             if not ok then
-                log.debug(err)
+                log.error(text.poll_fail, err)
             end
             skynet.sleep(timeout)
         end

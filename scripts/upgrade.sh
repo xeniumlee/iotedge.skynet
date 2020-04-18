@@ -37,4 +37,6 @@ systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}
 systemctl restart ${CORE_SERVICE}
 systemctl restart ${NODE_SERVICE}
-systemctl restart ${FRP_SERVICE}
+if [ -f ./run/frpc.ini ]; then
+    systemctl restart ${FRP_SERVICE}
+fi

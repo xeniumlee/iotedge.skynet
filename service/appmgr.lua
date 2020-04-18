@@ -557,7 +557,9 @@ function command.upgrade(version)
     end
     locked = true
     ok, err = api.internal_request("upgrade", version)
-    locked = false
+    if not ok then
+        locked = false
+    end
     return ok, err
 end
 

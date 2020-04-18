@@ -236,7 +236,7 @@ local function handle_rpc(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_rpc(msg)
-            log.debug("rpc", dev, cmd, dump(arg))
+            log.error(log_prefix, "decoded rpc", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then
@@ -261,7 +261,7 @@ local function decode_config(msg)
         log.error(log_prefix, text.unpack_fail)
         error(text.unpack_fail)
     end
-    log.debug(dump(conf))
+    log.error(log_prefix, "origin config", dump(conf))
     if type(conf.apps) == "table" then
         local apps = conf.apps
         local app_name, device_name, tag_name
@@ -294,7 +294,7 @@ local function decode_config(msg)
             conf.frp = nil
         end
     end
-    log.debug(dump(conf))
+    log.error(log_prefix, "decoded config", dump(conf))
     return conf
 end
 
@@ -376,6 +376,7 @@ local function handle_req(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_req(msg)
+            log.error(log_prefix, "decoded req", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then

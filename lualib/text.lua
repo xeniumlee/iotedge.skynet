@@ -45,7 +45,8 @@ local text = {
         invalid_addr = "invalid addr of response",
         invalid_write = "invalid write",
         exception = "exception raised",
-        write_ok = "write done"
+        write_suc = "write done",
+        poll_fail = "poll failed",
     },
     sysmgr = {
         unknown_cmd = "unknown command",
