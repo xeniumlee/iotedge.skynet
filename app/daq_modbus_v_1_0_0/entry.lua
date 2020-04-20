@@ -384,23 +384,13 @@ local function validate_write_addr(t, addrlist)
         addrlist[t.fc] = {}
     end
     local list = addrlist[t.fc]
-    if t.bit then
-        local a = t.addr
-        if list[a] then
-            assert(not list[a].name and not list[a][t.bit],
-                text.invalid_addr_conf)
-            list[a][t.bit] = t
+    -- DO NOT support multiple boolean tags share the same address
+    for a = t.addr, t.addr+t.number-1 do
+        assert(not list[a], text.invalid_addr_conf)
+        if a == t.addr then
+            list[a] = t
         else
-            list[a] = { [t.bit] = t }
-        end
-    else
-        for a = t.addr, t.addr+t.number-1 do
-            assert(not list[a], text.invalid_addr_conf)
-            if a == t.addr then
-                list[a] = t
-            else
-                list[a] = true
-            end
+            list[a] = true
         end
     end
 end
@@ -419,16 +409,10 @@ local function validate_addr(polllist, writelist)
             local poll = polllist[fc].list
             for a, t in pairs(list) do
                 if type(poll[a]) == "table" then
-                    if poll[a].name then
-                        same_dt(poll[a], t)
-                    else
-                        assert(not t.name, text.invalid_addr_conf)
-                        for bit, tag in pairs(poll[a]) do
-                            if t[bit] then
-                                same_dt(tag, t[bit])
-                            end
-                        end
-                    end
+                    assert(poll[a].name and
+                           t.name,
+                           text.invalid_addr_conf)
+                    same_dt(poll[a], t)
                 end
             end
         end

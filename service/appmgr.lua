@@ -21,6 +21,15 @@ local tpllist = {}
 local appmonitor = {}
 local command = {}
 
+-- https://www.lua.org/manual/5.3/manual.html#3.4.7
+local function gen_pipeid()
+    return #pipelist + 1
+end
+
+local function gen_appid()
+    return #applist + 1
+end
+
 local function sysapp(id)
     return id == mqttappid or
            id == wsappid or
@@ -582,7 +591,7 @@ function command.app_new(arg)
         return false, text.sysapp_create
     end
 
-    local id = #applist+1
+    local id = gen_appid()
     local err
     ok, err = load_app(id, tpl)
     if ok then
@@ -618,7 +627,7 @@ function command.pipe_new(pipe)
     if not ok then
         return ok, err
     end
-    local id = #pipelist+1
+    local id = gen_pipeid()
     ok, err = load_pipe(id, pipe.apps)
     if ok then
         try_start_pipe(id, pipe.auto)
