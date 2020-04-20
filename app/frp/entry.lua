@@ -41,8 +41,7 @@ local proxylist = {
         local_port = sys.ws_port
     },
     vpn = {
-        name = "vpn",
-        type = "udp",
+        type = "stcp",
         local_ip = "127.0.0.1",
         local_port = 1194
     }
@@ -85,8 +84,8 @@ local cmd_desc = {
     close_ssh = "Close ssh port",
     open_ws = "<remote_port>",
     close_ws = "Close websocket port",
-    open_vpn = "<remote_port>",
-    close_vpn = "Close VPN server",
+    open_vpn = "<token>",
+    close_vpn = "<token>",
     open = "{ name=<string>, type=<string>, local_ip=<string>, local_port=<number>, remote_port=<number> }",
     close = "<name>",
     list = "list all opened proxy"
@@ -129,14 +128,6 @@ local function reload()
     end
 end
 
-local function open_vpn_server()
-    return true
-end
-
-local function close_vpn_server()
-    return true
-end
-
 local function init_conf(cfg)
     local ok, conf = pcall(ini.parse, frpcini)
     if ok then
@@ -167,10 +158,16 @@ local function dup(proxy)
     for name, p in pairs(frpcconf) do
         if proxy.name == name or
            (proxy.type == p.type and
-           proxy.remote_port == p.remote_port) or
-           (proxy.type == p.type and
-            proxy.local_ip == p.local_ip and
-            proxy.local_port == p.local_port) then
+           proxy.remote_port == p.remote_port) then
+            return true
+        end
+    end
+    return false
+end
+
+local function dup_vpn(name)
+    for n, _ in pairs(frpcconf) do
+        if n == name then
             return true
         end
     end
@@ -178,19 +175,26 @@ local function dup(proxy)
 end
 
 local function do_open(p)
-    local ok = pcall(validate, p, p_schema)
-    if ok and not dup(p) then
-        return update(p.name, p)
+    return update(p.name, p)
+end
+local function do_close(name)
+    return update(name)
+end
+
+function open(proxy)
+    local ok = pcall(validate, proxy, p_schema)
+    if ok and not dup(proxy) then
+        return do_open(proxy)
     else
         return false, text.invalid_arg
     end
 end
-
-function open(arg)
-    return do_open(arg)
-end
 function close(name)
-    return update(name)
+    if type(name) == "string" then
+        return do_close(name)
+    else
+        return false, text.invalid_arg
+    end
 end
 
 function open_console(port)
@@ -203,7 +207,7 @@ function open_console(port)
     end
 end
 function close_console()
-    return update(proxylist.console.name)
+    return do_close(proxylist.console.name)
 end
 
 function open_ssh(port)
@@ -216,7 +220,7 @@ function open_ssh(port)
     end
 end
 function close_ssh()
-    return update(proxylist.ssh.name)
+    return do_close(proxylist.ssh.name)
 end
 
 function open_ws(port)
@@ -229,26 +233,24 @@ function open_ws(port)
     end
 end
 function close_ws()
-    return update(proxylist.ws.name)
+    return do_close(proxylist.ws.name)
 end
 
-function open_vpn(port)
-    local p = tonumber(port)
-    if p then
-        proxylist.vpn.remote_port = p
-        local ok = do_open(proxylist.vpn)
-        if ok then
-            return open_vpn_server()
-        else
-            return ok
-        end
+function open_vpn(token)
+    if type(token) == "string" and not dup_vpn(token) then
+        proxylist.vpn.name = token
+        proxylist.vpn.sk = token
+        return do_open(proxylist.vpn)
     else
         return false, text.invalid_arg
     end
 end
-function close_vpn()
-    update(proxylist.vpn.name)
-    return close_vpn_server()
+function close_vpn(token)
+    if type(token) == "string" then
+        return do_close(token)
+    else
+        return false, text.invalid_arg
+    end
 end
 
 function list()
