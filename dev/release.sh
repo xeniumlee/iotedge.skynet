@@ -44,13 +44,7 @@ if [ -n "${PLAT}" ]; then
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
-        DIRS="${INFO} bin config.* \
-              scripts/*.service \
-              scripts/prepare.sh \
-              scripts/install.sh \
-              scripts/uninstall.sh \
-              scripts/upgrade.sh \
-              iotedge.config.prod"
+        DIRS="${INFO} bin config.* scripts iotedge.config.prod"
 
         tar --transform="s|bin/skynet$|bin/iotedge|" \
             --transform="s|^|iotedge-${REV}/|" \

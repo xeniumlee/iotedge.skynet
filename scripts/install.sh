@@ -41,20 +41,24 @@ sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
     UNIT_FILE=/etc/systemd/system/$2
-    cp -f ./scripts/$1 ${UNIT_FILE}
+    cp -f $1 ${UNIT_FILE}
     sed -i "s|WORKING_DIR|${PWD}|g" ${UNIT_FILE}
 }
 
 CORE_SERVICE=iotedge-${REV}.service
 NODE_SERVICE=nodeexporter.service
 FRP_SERVICE=frpc.service
+VPN_SERVICE=vpn.service
 
-install iotedge.service ${CORE_SERVICE}
-install ${NODE_SERVICE} ${NODE_SERVICE}
-install ${FRP_SERVICE} ${FRP_SERVICE}
+install ./scripts/iotedge.service ${CORE_SERVICE}
+install ./app/host/${NODE_SERVICE} ${NODE_SERVICE}
+install ./app/frp/${FRP_SERVICE} ${FRP_SERVICE}
+install ./app/vpn/${VPN_SERVICE} ${VPN_SERVICE}
 
 systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}
+systemctl restart ${CORE_SERVICE}
+
 systemctl enable ${NODE_SERVICE}
 systemctl enable ${FRP_SERVICE}
-systemctl restart ${CORE_SERVICE}
+systemctl enable ${VPN_SERVICE}

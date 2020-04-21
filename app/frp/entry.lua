@@ -43,7 +43,7 @@ local proxylist = {
     vpn = {
         type = "stcp",
         local_ip = "127.0.0.1",
-        local_port = 1194
+        local_port = sys.vpn_port
     }
 }
 
@@ -98,34 +98,33 @@ local function reg_cmd()
 end
 
 local function start()
-    local ok, exit, errno = os.execute(start_cmd)
-    if ok and exit == "exit" and errno == 0 then
+    local ok  = sys.exec(start_cmd)
+    if ok then
         log.error(text.start_suc)
-        return true
     else
         log.error(text.start_fail)
-        return false
     end
+    return ok
 end
 
 local function stop()
-    local ok, exit, errno = os.execute(stop_cmd)
-    if ok and exit == "exit" and errno == 0 then
+    local ok  = sys.exec(stop_cmd)
+    if ok then
         log.error(text.stop_suc)
     else
         log.error(text.stop_fail)
     end
+    return ok
 end
 
 local function reload()
-    local ok, exit, errno = os.execute(reload_cmd)
-    if ok and exit == "exit" and errno == 0 then
+    local ok  = sys.exec(reload_cmd)
+    if ok then
         log.error(text.reload_suc)
-        return true
     else
         log.error(text.reload_fail)
-        return false
     end
+    return ok
 end
 
 local function init_conf(cfg)
@@ -265,12 +264,9 @@ end
 
 function on_conf(cfg)
     local ok = pcall(validate, cfg, cfg_schema)
-    if not ok then
+    if ok then
+        return init_conf(cfg)
+    else
         return false, text.invalid_conf
     end
-    return init_conf(cfg)
-end
-
-function on_exit()
-    --stop()
 end

@@ -3,31 +3,30 @@ local log = require "log"
 local api = require "api"
 local sys = require "sys"
 local http = require "utils.http"
+local text = require("text").node
 
 local uri = "http://localhost:9100/metrics"
 local start_cmd = "systemctl restart nodeexporter"
 local stop_cmd = "systemctl stop nodeexporter"
-local running = false
 
 local function start()
-    local ok, exit, errno = os.execute(start_cmd)
-    if ok and exit == "exit" and errno == 0 then
-        log.error("nodeexporter started")
-        running = true
-        return true
+    local ok  = sys.exec(start_cmd)
+    if ok then
+        log.error(text.start_suc)
     else
-        log.error("start nodeexporter failed")
-        return false
+        log.error(text.start_fail)
     end
+    return ok
 end
 
 local function stop()
-    local ok, exit, errno = os.execute(stop_cmd)
-    if ok and exit == "exit" and errno == 0 then
-        log.error("nodeexporter stopped")
+    local ok  = sys.exec(stop_cmd)
+    if ok then
+        log.error(text.stop_suc)
     else
-        log.error("stop nodeexporter failed")
+        log.error(text.stop_fail)
     end
+    return ok
 end
 
 local function fetch()
@@ -44,7 +43,7 @@ end
 local function post_telemetry(tags)
     start()
     local post = api.post_gtelemetry
-    while running do
+    while true do
         local data = {}
         local m = fetch()
         local v
@@ -71,7 +70,7 @@ end
 local function post_attributes()
     local post = api.post_gattr
     local key = sys.infokey
-    while running do
+    while true do
         local info = api.sys_request("info")
         for _, app in pairs(info.apps) do
             app.conf = nil
@@ -92,9 +91,4 @@ function on_conf(cfg)
     skynet.fork(post_telemetry, tags)
     skynet.fork(post_attributes)
     return true
-end
-
-function on_exit()
-    running = false
-    --stop()
 end

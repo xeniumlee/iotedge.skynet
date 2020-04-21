@@ -20,6 +20,7 @@ end
 local sys = {
     console_port = 30000,
     ws_port = 30001,
+    vpn_port = 1194,
     app_root = "app",
     db_root = "db",
     run_root = "run",
@@ -93,6 +94,9 @@ function sys.memlimit()
     else
         return nil
     end
+end
+function sys.exec(cmd)
+    return execute(cmd)
 end
 function sys.exec_with_return(cmd)
     if type(cmd) == "string" then

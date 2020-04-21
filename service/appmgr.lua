@@ -13,6 +13,7 @@ local wsappid = "ws"
 local mqttappid = "mqtt"
 local hostappid = "host"
 local frpappid = "frp"
+local vpnappid = "vpn"
 
 local sysinfo = {}
 local applist = {}
@@ -34,7 +35,8 @@ local function sysapp(id)
     return id == mqttappid or
            id == wsappid or
            id == hostappid or
-           id == frpappid
+           id == frpappid or
+           id == vpnappid
 end
 
 local function syspipe(id)
@@ -427,6 +429,11 @@ local function load_frpapp()
     load_app(frpappid, tpl)
 end
 
+local function load_vpnapp()
+    local tpl = vpnappid
+    load_app(vpnappid, tpl)
+end
+
 local function load_sysapp()
     local now = api.datetime()
     applist[wsappid] = {
@@ -450,6 +457,7 @@ local function load_sysapp()
         load_hostapp()
     end
     load_frpapp()
+    load_vpnapp()
 end
 
 local cmd_desc = {

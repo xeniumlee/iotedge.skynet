@@ -149,6 +149,22 @@ local text = {
         reload_fail = "reload frpc failed",
         invalid_conf = "invalid configuration",
         invalid_arg = "invalid argument"
+    },
+    vpn = {
+        start_suc = "vpn started",
+        start_fail = "start vpn failed",
+        stop_suc = "vpn stopped",
+        stop_fail = "stop vpn failed",
+        setup_suc = "vpn installed",
+        setup_fail = "install vpn failed",
+        conf_fail = "configure vpn failed",
+        invalid_conf = "invalid configuration",
+    },
+    node = {
+        start_suc = "nodeexporter started",
+        start_fail = "start nodeexporter failed",
+        stop_suc = "nodeexporter stopped",
+        stop_fail = "stop nodeexporter failed",
     }
 }
 
