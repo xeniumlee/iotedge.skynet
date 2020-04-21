@@ -14,15 +14,11 @@ if [ -f $DIR/run/frpc.ini ]; then
     mkdir run
     cp -f $DIR/run/frpc.ini ./run/
 fi
-if [ -f $DIR/run/vpn.conf ]; then
-    if [ ! -d run ]; then
-        mkdir run
-    fi
-    cp -f $DIR/run/vpn.conf ./run/
-fi
 
 sed -i "s|.*release.*|    release = '${REV}',|; \
         s|.*cluster.*|    cluster = ${PORT},|" ${CONFIG}
+
+
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
@@ -36,7 +32,7 @@ NODE_SERVICE=nodeexporter.service
 FRP_SERVICE=frpc.service
 VPN_SERVICE=vpn.service
 
-install iotedge.service ${CORE_SERVICE}
+install ./scripts/iotedge.service ${CORE_SERVICE}
 install ./app/host/${NODE_SERVICE} ${NODE_SERVICE}
 install ./app/frp/${FRP_SERVICE} ${FRP_SERVICE}
 install ./app/vpn/${VPN_SERVICE} ${VPN_SERVICE}

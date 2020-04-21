@@ -1,20 +1,18 @@
 local skynet = require "skynet"
 local validate = require "utils.validate"
-local text = require("text").vpn
+local text = require("text").app
 local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
 local vpnconf = "run/vpn.conf"
-local vpnconf_tpl = "app/vpn/vpn.conf"
+local install_cmd = "app/vpn/setup.sh"
 local cacrt = "app/vpn/ca.crt"
 local servercrt = "app/vpn/server.crt"
 local serverkey = "app/vpn/server.key"
 local takey = "app/vpn/ta.key"
 
-local setup_cmd = "app/vpn/setup.sh"
-local start_cmd = "systemctl restart vpn"
-local stop_cmd = "systemctl stop vpn"
+local svc = "vpn"
 
 local cfg_schema = {
     eth = function(v)
@@ -46,36 +44,10 @@ local cfg_schema = {
     end
 }
 
-local function setup(start, eth, ipaddr, netmask)
-    local s = start and "start" or "stop"
-    local cmd = string.format("%s %s %s %s/%d", setup_cmd, s, eth, ipaddr, netmask)
-    local ok  = sys.exec(cmd)
-    if ok then
-        log.error(text.setup_suc)
-    else
-        log.error(text.setup_fail)
-    end
-    return ok
-end
-
-local function start()
-    local ok  = sys.exec(start_cmd)
-    if ok then
-        log.error(text.start_suc)
-    else
-        log.error(text.start_fail)
-    end
-    return ok
-end
-
-local function stop()
-    local ok  = sys.exec(stop_cmd)
-    if ok then
-        log.error(text.stop_suc)
-    else
-        log.error(text.stop_fail)
-    end
-    return ok
+local function install(start, eth, ipaddr, netmask)
+    local action = start and "start" or "stop"
+    local cmd = string.format("%s %s %s %s/%d", install_cmd, action, eth, ipaddr, netmask)
+    return sys.exec(cmd)
 end
 
 local function write_conf(file, conf)
@@ -109,16 +81,24 @@ local function gen_conf(cfg)
 end
 
 local function init_conf(cfg)
-    local ok = setup(true, cfg.eth, cfg.ipaddr, cfg.netmask)
+    local ok = install(true, cfg.eth, cfg.ipaddr, cfg.netmask)
     if ok then
         ok = pcall(gen_conf, cfg)
         if ok then
-            return start()
+            local err
+            ok, err = sys.start_svc(svc)
+            log.error(err)
+
+            if ok then
+                _, err = sys.enable_svc(svc)
+                log.error(err)
+            end
+            return ok
         else
             return false, text.conf_fail
         end
     else
-        return false, text.setup_fail
+        return false, text.install_fail
     end
 end
 
@@ -131,6 +111,12 @@ function on_conf(cfg)
             return false, text.invalid_conf
         end
     else
-        return stop()
+        local ok, err = sys.stop_svc(svc)
+        log.error(err)
+
+        _, err = sys.disable_svc(svc)
+        log.error(err)
+
+        return ok
     end
 end

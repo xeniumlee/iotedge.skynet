@@ -5,13 +5,9 @@ local upgrade_cmd = "scripts/upgrade.sh"
 local uninstall_cmd = "scripts/uninstall.sh"
 
 local function execute(cmd)
-    if type(cmd) == "string" then
-        local ok, exit, errno = os.execute(cmd)
-        if ok and exit == "exit" and errno == 0 then
-            return true
-        else
-            return false
-        end
+    local ok, exit, errno = os.execute(cmd)
+    if ok and exit == "exit" and errno == 0 then
+        return true
     else
         return false
     end
@@ -31,6 +27,28 @@ local sys = {
     gateway_global = "iotedge-gateway",
     infokey = "edgeinfo"
 }
+
+function sys.exec(cmd)
+    return execute(cmd)
+end
+
+function sys.exec_with_return(cmd)
+    if type(cmd) == "string" then
+        local f = io.popen(cmd)
+        if f then
+            local s = f:read("a")
+            if s ~= "" then
+                return s
+            else
+                return false
+            end
+        else
+            return false
+        end
+    else
+        return false
+    end
+end
 
 function sys.resolve(hostname)
     if hostname:match("^[%.%d]+$") then
@@ -60,18 +78,22 @@ function sys.quit()
         skynet.abort()
     end
 end
+
 function sys.unzip(f, dir)
     if not dir then
         dir = "."
     end
     return execute("tar -C "..dir.." -xzf "..f)
 end
+
 function sys.upgrade(dir, config, port)
     return execute(table.concat({upgrade_cmd, dir, config, port}, " "))
 end
+
 function sys.core_name(version)
     return string.format("%s-%s", "iotedge", version)
 end
+
 function sys.app_uri(uri, platform, name)
     if name then
         name = name:match("(.+)_v_.+")
@@ -80,6 +102,7 @@ function sys.app_uri(uri, platform, name)
     end
     return string.format("%s/%s/%s/", uri, platform, name)
 end
+
 function sys.app_tarball(name)
     local n = name:match(".+_(v_.+)")
     if not n then
@@ -87,6 +110,7 @@ function sys.app_tarball(name)
     end
     return n..".tar.gz"
 end
+
 function sys.memlimit()
     local limit = skynet.getenv("memlimit")
     if limit then
@@ -95,25 +119,38 @@ function sys.memlimit()
         return nil
     end
 end
-function sys.exec(cmd)
-    return execute(cmd)
-end
-function sys.exec_with_return(cmd)
-    if type(cmd) == "string" then
-        local f = io.popen(cmd)
-        if f then
-            local s = f:read("a")
-            if s ~= "" then
-                return s
-            else
-                return false
-            end
-        else
-            return false
-        end
+
+------------------------------------------
+local function handle_svc(cmd, svc)
+    local c = string.format("systemctl %s %s", cmd, svc)
+    local suc = string.format("%s %s successfully", cmd, svc)
+    local fail = string.format("%s %s failed", cmd, svc)
+    local ok  = execute(c)
+    if ok then
+        return ok, suc
     else
-        return false
+        return ok, fail
     end
+end
+
+function sys.enable_svc(svc)
+    return handle_svc("enable", svc)
+end
+
+function sys.disable_svc(svc)
+    return handle_svc("disable", svc)
+end
+
+function sys.start_svc(svc)
+    return handle_svc("start", svc)
+end
+
+function sys.stop_svc(svc)
+    return handle_svc("stop", svc)
+end
+
+function sys.reload_svc(svc)
+    return handle_svc("reload", svc)
 end
 
 ------------------------------------------

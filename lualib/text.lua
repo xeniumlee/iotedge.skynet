@@ -12,6 +12,9 @@ local text = {
         no_conf_handler = "no conf handler",
         pack_fail = "pack failed",
         invalid_arg = "invalid argument",
+        invalid_conf = "invalid configuration",
+        conf_fail = "configure failed",
+        install_fail = "install failed",
     },
     store = {
         open_suc = "DB opened",
@@ -140,32 +143,6 @@ local text = {
         close = "closed",
         busy = "busy",
     },
-    frp = {
-        start_suc = "frpc started",
-        start_fail = "start frpc failed",
-        stop_suc = "frpc stopped",
-        stop_fail = "stop frpc failed",
-        reload_suc = "frpc reloaded",
-        reload_fail = "reload frpc failed",
-        invalid_conf = "invalid configuration",
-        invalid_arg = "invalid argument"
-    },
-    vpn = {
-        start_suc = "vpn started",
-        start_fail = "start vpn failed",
-        stop_suc = "vpn stopped",
-        stop_fail = "stop vpn failed",
-        setup_suc = "vpn installed",
-        setup_fail = "install vpn failed",
-        conf_fail = "configure vpn failed",
-        invalid_conf = "invalid configuration",
-    },
-    node = {
-        start_suc = "nodeexporter started",
-        start_fail = "start nodeexporter failed",
-        stop_suc = "nodeexporter stopped",
-        stop_fail = "stop nodeexporter failed",
-    }
 }
 
 return setmetatable({}, {

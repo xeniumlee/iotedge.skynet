@@ -37,6 +37,7 @@ elif [ ${CONFIG} = "config.local" ]; then
             s|SYS_PLAT|${PLAT}|" ${CONFIG}
 fi
 
+
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
@@ -58,7 +59,3 @@ install ./app/vpn/${VPN_SERVICE} ${VPN_SERVICE}
 systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}
 systemctl restart ${CORE_SERVICE}
-
-systemctl enable ${NODE_SERVICE}
-systemctl enable ${FRP_SERVICE}
-systemctl enable ${VPN_SERVICE}

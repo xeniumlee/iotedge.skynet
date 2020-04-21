@@ -1,15 +1,13 @@
 local skynet = require "skynet"
 local ini = require "utils.inifile"
 local validate = require "utils.validate"
-local text = require("text").frp
+local text = require("text").app
 local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
 local frpcini = "run/frpc.ini"
-local start_cmd = "systemctl restart frpc"
-local stop_cmd = "systemctl stop frpc"
-local reload_cmd = "systemctl reload frpc"
+local svc = "frpc"
 
 local frpcconf = {
     common = {
@@ -97,36 +95,6 @@ local function reg_cmd()
     end
 end
 
-local function start()
-    local ok  = sys.exec(start_cmd)
-    if ok then
-        log.error(text.start_suc)
-    else
-        log.error(text.start_fail)
-    end
-    return ok
-end
-
-local function stop()
-    local ok  = sys.exec(stop_cmd)
-    if ok then
-        log.error(text.stop_suc)
-    else
-        log.error(text.stop_fail)
-    end
-    return ok
-end
-
-local function reload()
-    local ok  = sys.exec(reload_cmd)
-    if ok then
-        log.error(text.reload_suc)
-    else
-        log.error(text.reload_fail)
-    end
-    return ok
-end
-
 local function init_conf(cfg)
     local ok, conf = pcall(ini.parse, frpcini)
     if ok then
@@ -136,8 +104,15 @@ local function init_conf(cfg)
     frpcconf.common.server_port = cfg.server_port
     frpcconf.common.token = cfg.token
     ini.save(frpcini, frpcconf)
-    ok = start()
+
+    local err
+    ok, err = sys.start_svc(svc)
+    log.error(err)
+
     if ok then
+        _, err = sys.enable_svc(svc)
+        log.error(err)
+
         reg_cmd()
     end
     return ok
@@ -147,7 +122,9 @@ local function update(name, p)
     if (frpcconf[name] and not p) or p then
         frpcconf[name] = p
         ini.save(frpcini, frpcconf)
-        return reload()
+        local ok, err = sys.reload_svc(svc)
+        log.error(err)
+        return ok
     else
         return false, text.invalid_arg
     end
