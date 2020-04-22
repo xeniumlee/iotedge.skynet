@@ -18,12 +18,6 @@ local cfg_schema = {
     eth = function(v)
         return type(v)=="string" and #v > 0
     end,
-    ipaddr = function(v)
-        return type(v)=="string" and v:match("^[%d%.]+$")
-    end,
-    netmask = function(v)
-        return math.tointeger(v) and v>0 and v<32
-    end,
     proto = function(v)
         return v=="tcp4" or v=="udp4"
     end,
@@ -44,10 +38,10 @@ local cfg_schema = {
     end
 }
 
-local function install(start, eth, ipaddr, netmask)
+local function install(start, eth)
     local action = start and "start" or "stop"
-    local cmd = string.format("%s %s %s %s/%d", install_cmd, action, eth, ipaddr, netmask)
-    return sys.exec(cmd)
+    local cmd = string.format("%s %s %s", install_cmd, action, eth)
+    return sys.exec_with_return(cmd)
 end
 
 local function write_conf(file, conf)
@@ -80,22 +74,51 @@ local function gen_conf(cfg)
     end
 end
 
-local function init_conf(cfg)
-    local ok = install(true, cfg.eth, cfg.ipaddr, cfg.netmask)
-    if ok then
-        ok = pcall(gen_conf, cfg)
-        if ok then
-            local err
-            ok, err = sys.start_svc(svc)
-            log.error(err)
+local function gen_server_bridge(cfg, ipaddr)
+    local ip, mask = ipaddr:match("^([.%d]+)/(%d+)$")
+    mask = math.tointeger(mask)
+    if ip and mask then
+        mask = (0xffffffff << (32-mask)) & 0xffffffff
+        mask = string.format(
+            "%d.%d.%d.%d",
+            (mask>>24)&0xff,
+            (mask>>16)&0xff,
+            (mask>>8)&0xff,
+            mask&0xff
+            )
+        cfg.serverbridge = string.format(
+            "%s %s %s",
+            ip,
+            mask,
+            cfg.serverbridge
+            )
+        return true
+    else
+        return false
+    end
+end
 
+local function init_conf(cfg)
+    local ipaddr = install(true, cfg.eth)
+    if ipaddr then
+        local ok = gen_server_bridge(cfg, ipaddr)
+        if ok then
+            ok = pcall(gen_conf, cfg)
             if ok then
-                _, err = sys.enable_svc(svc)
+                local err
+                ok, err = sys.start_svc(svc)
                 log.error(err)
+
+                if ok then
+                    _, err = sys.enable_svc(svc)
+                    log.error(err)
+                end
+                return ok
+            else
+                return false, text.conf_fail
             end
-            return ok
         else
-            return false, text.conf_fail
+            return false, text.invalid_conf
         end
     else
         return false, text.install_fail

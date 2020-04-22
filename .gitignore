@@ -11,3 +11,5 @@
 *.o
 *.so
 *.luac
+*.crt
+*.key

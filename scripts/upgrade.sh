@@ -22,7 +22,7 @@ sed -i "s|.*release.*|    release = '${REV}',|; \
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
 install() {
-    UNIT_FILE=/etc/systemd/system/$2
+    local UNIT_FILE=/etc/systemd/system/$2
     cp -f $1 ${UNIT_FILE}
     sed -i "s|WORKING_DIR|${PWD}|g" ${UNIT_FILE}
 }

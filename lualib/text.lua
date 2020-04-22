@@ -94,6 +94,7 @@ local text = {
         loop = "endless loop detected",
         locked = "system in maintenance",
         cleaned = "all configuration cleaned",
+        app_conf = "APP configuration",
         conf_fail = "configure failed",
     },
     gateway = {

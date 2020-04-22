@@ -57,7 +57,7 @@ fi
 
 # Clean
 clean_svc() {
-    SVC=$1
+    local SVC=$1
     systemctl stop ${SVC}
     systemctl disable ${SVC}
 }

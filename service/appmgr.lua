@@ -2,6 +2,7 @@ local skynet = require "skynet"
 local core = require "skynet.core"
 local api = require "api"
 local log = require "log"
+local dump = require "utils.dump"
 local text = require("text").appmgr
 
 local interval = 500 -- 5 seconds
@@ -195,7 +196,7 @@ local function clone(tpl, custom)
         local copy = {}
         for k, v in pairs(tpl) do
             if k ~= force then
-                if custom[k] then
+                if custom[k] ~= nil then
                     copy[k] = clone(v, custom[k])
                 else
                     copy[k] = v
@@ -376,6 +377,7 @@ local function configure_all(arg, nosave)
     local ok, err, tpl, conf
     for id, app in pairs(arg.apps) do
         tpl, conf = next(app)
+        log.error(text.app_conf, tostring(id), tpl, dump(conf))
         if sysapp(id) then
             ok, err = configure_app(id, conf, nosave)
             if not ok then
@@ -549,6 +551,7 @@ function command.configure(arg)
             if applist[id].read_only then
                 ok, err = false, text.app_readonly
             else
+                log.error(text.app_conf, tostring(id), dump(conf))
                 ok, err = configure_app(id, conf)
             end
         end
@@ -583,6 +586,7 @@ end
 function command.mqttapp(conf)
     local m = applist[mqttappid]
     m.conf = conf
+    refresh_info()
     return true
 end
 

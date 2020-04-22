@@ -10,9 +10,9 @@ REPO=$2
 
 upload() {
     if [ -n "${REPO}" ]; then
-        DIR=$1
-        TARBALL=$2
-        TARGET=${REPO}/${PLAT}/${DIR}
+        local DIR=$1
+        local TARBALL=$2
+        local TARGET=${REPO}/${PLAT}/${DIR}
         ssh -oStrictHostKeyChecking=no ${REPO%:*} "mkdir -p ${REPO#*:}/${PLAT}/${DIR}"
         scp -oStrictHostKeyChecking=no -q ${TARBALL} ${TARGET}/
         echo "${TARBALL} uploaded to ${TARGET}"
