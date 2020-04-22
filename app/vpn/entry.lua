@@ -7,11 +7,6 @@ local api = require "api"
 
 local vpnconf = "run/vpn.conf"
 local install_cmd = "app/vpn/setup.sh"
-local cacrt = "app/vpn/ca.crt"
-local servercrt = "app/vpn/server.crt"
-local serverkey = "app/vpn/server.key"
-local takey = "app/vpn/ta.key"
-
 local svc = "vpn"
 
 local cfg_schema = {
@@ -44,25 +39,26 @@ local function install(start, eth)
     return sys.exec_with_return(cmd)
 end
 
-local function write_conf(file, conf)
-    local f = io.open(file, "w")
-    f:write(conf)
-    f:close()
-end
-
-local function append_conf(file, conf)
-    local f = io.open(file, "a")
+local function append_conf(conf)
+    local f = io.open(vpnconf, "a")
     f:write(conf..'\n')
     f:close()
 end
 
+local function append_pem(key)
+    return function(pem)
+        local conf = string.format("<%s>\n%s\n</%s>", key, pem, key)
+        append_conf(conf)
+    end
+end
+
 local conf_map = {
-    proto = function(v) append_conf(vpnconf, "proto "..v) end,
-    serverbridge = function(v) append_conf(vpnconf, "server-bridge "..v) end,
-    ca = function(v) write_conf(cacrt, v) end,
-    cert = function(v) write_conf(servercrt, v) end,
-    key = function(v) write_conf(serverkey, v) end,
-    tlsauth = function(v) write_conf(takey, v) end
+    proto = function(v) append_conf("proto "..v) end,
+    serverbridge = function(v) append_conf("server-bridge "..v) end,
+    ca = append_pem("ca"),
+    cert = append_pem("cert"),
+    key = append_pem("key"),
+    tlsauth = append_pem("tls-auth")
 }
 
 local function gen_conf(cfg)

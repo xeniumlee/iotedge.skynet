@@ -46,7 +46,7 @@ end
 
 local function make_appinfo(id, app)
     local info = {}
-    if id ~= hostappid then
+    if id ~= hostappid and id ~= vpnappid then
         info.conf = app.conf
     end
     info.load_time = app.load_time
