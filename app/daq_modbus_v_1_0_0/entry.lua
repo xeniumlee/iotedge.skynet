@@ -140,7 +140,7 @@ local function do_write(dev, tag, value)
     else
         assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
     end
-    log.error(text.write_suc, dev, tag, tostring(value))
+    log.info(text.write_suc, dev, tag, tostring(value))
 end
 
 function write(dev, arg)
@@ -569,7 +569,7 @@ local function stop()
         cli.channel:close()
     end
     if running then
-        log.error(text.poll_stop)
+        log.info(text.poll_stop)
         running = false
         unregdev()
         skynet.sleep(max_wait)
@@ -592,7 +592,7 @@ local function config_devices(d, tle)
     if ok then
         max_wait = max // 10
         skynet.fork(start, d, polls)
-        log.error(strfmt("%s: total(%d), max interval(%ds)",
+        log.info(strfmt("%s: total(%d), max interval(%ds)",
                 text.poll_start, #polls, max // 1000))
         return ok
     else

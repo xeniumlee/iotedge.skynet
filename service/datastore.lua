@@ -61,12 +61,12 @@ local function db_name(app)
 end
 
 local function retire(app)
-    log.error(text.retire, app.name)
+    log.info(text.retire, app.name)
     app.db:exec(sql_retire)
 end
 
 local function vacuum(app)
-    log.error(text.vacuum, app.name)
+    log.info(text.vacuum, app.name)
     app.db:exec(sql_vacuum)
 end
 
@@ -81,7 +81,7 @@ end
 local function close(app)
     local db = app.db
     if db and db:isopen() then
-        log.error(text.closed , app.name)
+        log.info(text.closed , app.name)
         db:close_vm()
         db:close()
     end
@@ -95,7 +95,7 @@ local function open(app)
     while not app.db do
         local db = sqlite3.open(n, open_f+sqlite3.OPEN_CREATE)
         if db and db:exec(sql_create) == sqlite3.OK then
-            log.error(text.open_suc, app.name)
+            log.info(text.open_suc, app.name)
             for k, v in pairs(sql) do
                 app[k] = db:prepare(v)
             end
@@ -127,7 +127,7 @@ local function try_open(app)
         while not app.db do
             local db = sqlite3.open(n, open_f)
             if db then
-                log.error(text.open_suc, app.name)
+                log.info(text.open_suc, app.name)
                 for k, v in pairs(sql) do
                     app[k] = db:prepare(v)
                 end
@@ -162,7 +162,7 @@ local function post(app, addr)
             stmt_delete:step()
         end
         if done then
-            log.error(text.post_done, app.name)
+            log.info(text.post_done, app.name)
             vacuum(app)
             close(app)
             break
@@ -197,7 +197,7 @@ function command.stop(addr)
 end
 
 function command.enable(addr, name)
-    log.error(text.enable, name)
+    log.info(text.enable, name)
     if not applist[addr] then
         applist[addr] = {}
     end
@@ -211,7 +211,7 @@ end
 function command.online(addr)
     local app = applist[addr]
     if app then
-        log.error(text.online, app.name)
+        log.info(text.online, app.name)
         app.online = true
         try_open(app)
         if app.db then
@@ -223,7 +223,7 @@ end
 function command.offline(addr)
     local app = applist[addr]
     if app then
-        log.error(text.offline, app.name)
+        log.info(text.offline, app.name)
         app.online = false
     end
 end

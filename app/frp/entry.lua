@@ -103,11 +103,11 @@ local function init_conf(cfg)
 
     local err
     ok, err = sys.start_svc(svc)
-    log.error(err)
+    log.info(err)
 
     if ok then
         _, err = sys.enable_svc(svc)
-        log.error(err)
+        log.info(err)
 
         reg_cmd()
     end
@@ -119,7 +119,7 @@ local function update(name, p)
         frpcconf[name] = p
         ini.save(frpcini, frpcconf)
         local ok, err = sys.reload_svc(svc)
-        log.error(err)
+        log.info(err)
         return ok
     else
         return false, text.invalid_arg

@@ -17,11 +17,6 @@ local sys = {
     console_port = 30000,
     ws_port = 30001,
     vpn_port = 1194,
-    wsappid = "ws",
-    mqttappid = "mqtt",
-    hostappid = "host",
-    frpappid = "frp",
-    vpnappid = "vpn",
     app_root = "app",
     db_root = "db",
     run_root = "run",
@@ -30,7 +25,6 @@ local sys = {
     meta_lua = "meta",
     entry_lua = "entry",
     gateway_global = "iotedge-gateway",
-    infokey = "edgeinfo"
 }
 
 function sys.exec(cmd)
@@ -69,7 +63,7 @@ function sys.resolve(hostname)
 end
 
 function sys.prod()
-    if skynet.getenv("loglevel"):match("ERROR") then
+    if skynet.getenv("loglevel"):match("INFO") then
         return true
     else
         return false

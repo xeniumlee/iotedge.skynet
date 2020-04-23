@@ -8,19 +8,11 @@ local sysmgr_addr = ...
 local command = {}
 local devlist = {}
 local applist = {}
-local internal = {
-    route_add = true,
-    route_del = true,
-    data = true,
-    payload = true,
-    conf = true,
-    exit = true
-}
 
 local function help()
     local ret = {}
     for k, v in pairs(devlist) do
-        if k ~= "internal" and not v.appname then
+        if k ~= api.internalappid and not v.appname then
             ret[k] = {}
             ret[k].devices = v.sublist
             local cmd = {}
@@ -40,12 +32,6 @@ local function invalidate_cache(name)
 end
 
 function command.reg_cmd(addr, name, desc)
-    if type(name) ~= "string" or
-        (type(desc) ~= "string" and type(desc) ~= "boolean") or
-        internal[name] then
-        log.error(text.invalid_cmd)
-        return
-    end
     local app = applist[addr]
     if not app then
         log.error(text.unknown_app)
@@ -56,7 +42,7 @@ function command.reg_cmd(addr, name, desc)
         return
     end
     app.cmdlist[name] = desc
-    log.error(text.cmd_registered, name)
+    log.info(text.cmd_registered, name)
 end
 
 function command.reg_dev(addr, name, desc)
@@ -96,7 +82,7 @@ function command.reg_dev(addr, name, desc)
         app.sublist[name] = desc
         invalidate_cache(name)
     end
-    log.error(text.dev_registered, name)
+    log.info(text.dev_registered, name)
 end
 
 function command.unreg_dev(addr, name)
@@ -118,12 +104,12 @@ function command.unreg_dev(addr, name)
         applist[addr] = nil
         invalidate_cache("help")
         invalidate_cache(app.name)
-        log.error(text.dev_unregistered, app.name)
+        log.info(text.dev_unregistered, app.name)
     else
         devlist[name] = nil
         app.sublist[name] = nil
         invalidate_cache(name)
-        log.error(text.dev_unregistered, name)
+        log.info(text.dev_unregistered, name)
     end
 end
 

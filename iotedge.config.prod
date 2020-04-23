@@ -1,7 +1,7 @@
 logger = "logger"
 logservice = "snlua"
 logpath = "logs"
-loglevel = "ERROR"
+loglevel = "INFO"
 
 cfg = "config"
 

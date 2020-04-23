@@ -87,7 +87,7 @@ local function handle_connect(connack, cli)
     if connack.rc ~= 0 then
         return
     end
-    log.error(log_prefix, text.connect_suc)
+    log.info(log_prefix, text.connect_suc)
 
     api.online()
     skynet.fork(ping, cli)

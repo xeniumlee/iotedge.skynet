@@ -5,6 +5,5 @@ conf = {
     ca = '',
     cert = '',
     key = '',
-    tlsauth = '',
     serverbridge = '',
 }

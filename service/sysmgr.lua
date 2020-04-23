@@ -46,7 +46,7 @@ local function save_cfg(file, key, conf)
         f:close()
     end)
     if ok then
-        log.error(text.config_update_suc, file)
+        log.info(text.config_update_suc, file)
         return ok
     else
         log.error(text.config_update_fail, file, err)
@@ -61,7 +61,7 @@ local function load_cfg(file, env)
             loadfile(file, "bt", env)()
         end)
         if ok then
-            log.error(text.config_load_suc, file)
+            log.info(text.config_load_suc, file)
         else
             log.error(text.config_load_fail, file, err)
             local bak = bak_file(file)
@@ -71,7 +71,7 @@ local function load_cfg(file, env)
                     loadfile(bak, "bt", env)()
                 end)
                 if ok then
-                    log.error(text.config_load_suc, bak)
+                    log.info(text.config_load_suc, bak)
                 else
                     log.error(text.config_load_fail, bak, err)
                 end
@@ -212,7 +212,7 @@ function command.update_app(arg)
             os.remove(f)
             os.remove(bak_file(f))
             cfg.apps[id] = nil
-            log.error(text.config_removed, f)
+            log.info(text.config_removed, f)
             return true
         else
             return false
@@ -233,7 +233,7 @@ function command.update_pipes(list)
         os.remove(pipe_cfg)
         os.remove(bak_file(pipe_cfg))
         cfg.pipes = {}
-        log.error(text.config_removed, pipe_cfg)
+        log.info(text.config_removed, pipe_cfg)
         return true
     end
 end
@@ -342,7 +342,7 @@ function command.upgrade(version)
 
         local attr = lfs.attributes(t_dir)
         if attr then
-            log.error(text.core_replace)
+            log.info(text.core_replace)
             os.remove(t_dir)
         end
 
@@ -381,7 +381,7 @@ function command.upgrade(version)
             local err
             ok, err = pcall(configure, t_port, c_total)
             if ok then
-                log.error(text.sys_exit)
+                log.info(text.sys_exit)
             else
                 log.error(text.configure_fail, err)
             end
@@ -419,39 +419,39 @@ local function launch()
 
     load_all()
     init_auth()
-    log.error("System starting")
+    log.info("System starting")
 
     local s = skynet.self()
     local g = skynet.uniqueservice("gateway", s)
     skynet.name(api.gateway_addr, g)
     cluster.register(gateway_global, g)
     cluster.open(cluster_reload(cluster, cluster_port()))
-    log.error("Gateway started")
+    log.info("Gateway started")
 
     api.internal_init(cmd_desc)
 
     cfg.store = skynet.uniqueservice("datastore")
     skynet.name(api.store_addr, cfg.store)
-    log.error("Store started")
+    log.info("Store started")
 
     cfg.gateway_console = skynet.uniqueservice("gateway_console", sys.console_port)
-    log.error("Console started")
+    log.info("Console started")
 
     cfg.gateway_ws = skynet.uniqueservice("gateway_ws", sys.ws_port)
-    log.error("Websocket started")
+    log.info("Websocket started")
 
     if cfg.gateway_mqtt then
         local c = cfg.gateway_mqtt.tpl
         cfg.gateway_mqtt_addr = skynet.uniqueservice(c)
-        log.error("MQTT started", c)
+        log.info("MQTT started", c)
     end
 
     cfg.appmgr = skynet.uniqueservice(true, "appmgr", cfg.gateway_ws, cfg.gateway_mqtt_addr)
     skynet.monitor("appmgr", true)
-    log.error("Monitor started")
+    log.info("Monitor started")
 
     --skynet.uniqueservice("debug_console", 12345)
-    log.error("System started:", cfg.sys.id, cfg.sys.version)
+    log.info("System started:", cfg.sys.id, cfg.sys.version)
 end
 
 skynet.start(function()

@@ -17,7 +17,6 @@ local cfg_schema = {
     ca = validator.string,
     cert = validator.string,
     key = validator.string,
-    tlsauth = validator.string,
     serverbridge = validator.string
 }
 
@@ -58,8 +57,7 @@ local conf_map = {
     serverbridge = function(v) append_conf("server-bridge "..v) end,
     ca = append_pem("ca"),
     cert = append_pem("cert"),
-    key = append_pem("key"),
-    tlsauth = append_pem("tls-auth")
+    key = append_pem("key")
 }
 
 local function gen_conf(cfg)
@@ -111,11 +109,11 @@ local function init_conf(cfg)
             if ok then
                 local err
                 ok, err = sys.start_svc(svc)
-                log.error(err)
+                log.info(err)
 
                 if ok then
                     _, err = sys.enable_svc(svc)
-                    log.error(err)
+                    log.info(err)
                 end
                 refresh_info(cfg)
 
@@ -146,10 +144,10 @@ function on_conf(cfg)
         end
     else
         local ok, err = sys.stop_svc(svc)
-        log.error(err)
+        log.info(err)
 
         _, err = sys.disable_svc(svc)
-        log.error(err)
+        log.info(err)
 
         refresh_info(cfg)
         return ok

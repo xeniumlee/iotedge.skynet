@@ -52,7 +52,7 @@ local function ensure_subscribe(cli, topic, qos)
         if ack.rc[1] ~= subsribe_ack_err_code then
             -- Strictly rc[1] >= qos
             done = true
-            log.error(log_prefix, text.sub_suc, topic)
+            log.info(log_prefix, text.sub_suc, topic)
         else
             log.error(log_prefix, text.sub_fail, topic)
         end
@@ -147,7 +147,7 @@ local function handle_connect(connack, cli)
     if connack.rc ~= 0 then
         return
     end
-    log.error(log_prefix, text.connect_suc)
+    log.info(log_prefix, text.connect_suc)
 
     api.online()
     skynet.fork(ping, cli)
@@ -236,7 +236,7 @@ local function handle_rpc(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_rpc(msg)
-            log.error(log_prefix, "decoded rpc", dev, cmd, dump(arg))
+            log.info(log_prefix, "decoded rpc", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then
@@ -250,52 +250,72 @@ local function handle_rpc(msg, cli)
     end
 end
 
+local function unpack_conf(conf)
+    local c = seri.unpack(conf)
+    if type(c) == "table" then
+        return c
+    else
+        log.error(log_prefix, text.unpack_fail)
+        error(text.unpack_fail)
+    end
+end
+
+local conf_map = {
+    configuration = function(conf)
+        local c = unpack_conf(conf)
+        if type(c.apps) == "table" then
+            local apps = c.apps
+            local app_name, device_name, tag_name
+            for i, app in pairs(apps) do
+                app_name = string.format("%s_%s", app.app_name, app.app_version)
+                app.app_name = nil
+                app.app_version = nil
+                if type(app.devices) == "table" then
+                    local devices = {}
+                    for _, device in pairs(app.devices) do
+                        device_name = device.device_name
+                        device.device_name = nil
+                        if type(device.tags) == "table" then
+                            local tags = {}
+                            for _, tag in pairs(device.tags) do
+                                tag_name = tag.tag_name
+                                tag.tag_name = nil
+                                tags[tag_name] = tag
+                            end
+                            device.tags = tags
+                        end
+                        devices[device_name] = device
+                    end
+                    app.devices = devices
+                end
+                apps[i] = { [app_name] = app }
+            end
+        end
+        return c
+    end,
+    vpn = unpack_conf,
+    frp = unpack_conf,
+    repo = unpack_conf
+}
+
 local function decode_config(msg)
     local conf = seri.unpack(msg.payload)
     if type(conf) ~= "table" then
         log.error(log_prefix, text.unpack_fail)
         error(text.unpack_fail)
     end
-    conf = seri.unpack(conf.configuration)
-    if type(conf) ~= "table" then
-        log.error(log_prefix, text.unpack_fail)
-        error(text.unpack_fail)
+    log.info(log_prefix, "origin config", dump(conf))
+
+    local k, v = next(conf)
+    local f = conf_map[k]
+    if f then
+        conf = f(v)
+        log.info(log_prefix, "decoded config", dump(conf))
+        return conf
+    else
+        log.error(log_prefix, text.invalid_conf, tostring(k))
+        error(text.invalid_conf)
     end
-    log.error(log_prefix, "origin config", dump(conf))
-    if type(conf.apps) == "table" then
-        local apps = conf.apps
-        local app_name, device_name, tag_name
-        for i, app in pairs(apps) do
-            app_name = string.format("%s_%s", app.app_name, app.app_version)
-            app.app_name = nil
-            app.app_version = nil
-            if type(app.devices) == "table" then
-                local devices = {}
-                for _, device in pairs(app.devices) do
-                    device_name = device.device_name
-                    device.device_name = nil
-                    if type(device.tags) == "table" then
-                        local tags = {}
-                        for _, tag in pairs(device.tags) do
-                            tag_name = tag.tag_name
-                            tag.tag_name = nil
-                            tags[tag_name] = tag
-                        end
-                        device.tags = tags
-                    end
-                    devices[device_name] = device
-                end
-                app.devices = devices
-            end
-            apps[i] = { [app_name] = app }
-        end
-        if type(conf.frp) == "table" then
-            apps.frp = { frp = conf.frp }
-            conf.frp = nil
-        end
-    end
-    log.error(log_prefix, "decoded config", dump(conf))
-    return conf
 end
 
 local function handle_config(msg, cli)
@@ -305,7 +325,7 @@ local function handle_config(msg, cli)
             local err
             ok, err = api.sys_request("configure", conf)
             if ok then
-                log.error(log_prefix, text.configure_suc)
+                log.info(log_prefix, text.configure_suc)
             else
                 log.error(log_prefix, text.configure_fail, err)
             end
@@ -314,14 +334,13 @@ local function handle_config(msg, cli)
 end
 
 local req_map = {
-    open_console = "frp",
-    open_ssh = "frp",
-    open_ws = "frp",
-    open_vpn = "frp",
-    open = "frp",
-    upgrade = "sys",
-    pipe_new = "sys",
-    pipe_remove = "sys"
+    open_console = api.frpappid,
+    open_ssh = api.frpappid,
+    open_ws = api.frpappid,
+    open_vpn = api.frpappid,
+    open_proxy = api.frpappid,
+    vpn_info = api.vpnappid,
+    upgrade = api.sysappid
 }
 
 --[[
@@ -376,7 +395,7 @@ local function handle_req(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_req(msg)
-            log.error(log_prefix, "decoded req", dev, cmd, dump(arg))
+            log.info(log_prefix, "decoded req", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then
@@ -458,7 +477,7 @@ function command.stop()
     running = false
     local ok, err = client:disconnect()
     if ok then
-        log.error(log_prefix, text.stop_suc)
+        log.info(log_prefix, text.stop_suc)
     else
         log.error(log_prefix, text.stop_fail, err)
     end
@@ -487,7 +506,7 @@ function command.data(dev, data)
 end
 
 local attributes_map = {
-    [sys.infokey] = "edgeinfo"
+    [api.infokey] = "edgeinfo"
 }
 
 local post_map = {

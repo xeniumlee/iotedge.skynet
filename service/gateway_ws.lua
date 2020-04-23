@@ -76,7 +76,7 @@ function handle.close(fd, code, reason)
     connected = false
     authed = false
     websocket.close(fd)
-    log.error("ws closed:", fd, code, reason)
+    log.info("ws closed:", fd, code, reason)
 end
 
 function handle.message(fd, msg)

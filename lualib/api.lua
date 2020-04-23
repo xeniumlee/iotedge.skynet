@@ -13,8 +13,25 @@ local store_addr = ".store"
 local appname
 local devlist = {}
 local r_table = {}
+local internal_cmd = {
+    route_add = true,
+    route_del = true,
+    data = true,
+    payload = true,
+    post = true,
+    conf = true,
+    exit = true
+}
 
 local api = {
+    internalappid = "internal",
+    sysappid = "sys",
+    wsappid = "ws",
+    mqttappid = "mqtt",
+    hostappid = "host",
+    frpappid = "frp",
+    vpnappid = "vpn",
+    infokey = "edgeinfo",
     gateway_addr = gateway_addr,
     store_addr = store_addr,
     batch_max = 200,
@@ -70,7 +87,10 @@ function api.datetime(time)
 end
 
 function api.reg_cmd(name, desc, internal)
-    if not internal and type(_ENV[name]) ~= "function" then
+    if type(name) ~= "string" or
+        (type(desc) ~= "string" and type(desc) ~= "boolean") or
+        internal_cmd[name] or
+        (not internal and type(_ENV[name]) ~= "function") then
         return
     end
     send(gateway_addr, "reg_cmd", name, desc)
@@ -217,14 +237,14 @@ function api.mqtt_init()
 end
 
 function api.internal_init(cmd_desc)
-    api.reg_dev("internal", true)
+    api.reg_dev(api.internalappid, true)
     for k, v in pairs(cmd_desc) do
         api.reg_cmd(k, v, true)
     end
 end
 
 function api.sys_init(cmd_desc)
-    api.reg_dev("sys", true)
+    api.reg_dev(api.sysappid, true)
     for k, v in pairs(cmd_desc) do
         api.reg_cmd(k, v, true)
     end
@@ -235,11 +255,11 @@ function api.external_request(...)
 end
 
 function api.sys_request(...)
-    return call(gateway_addr, "sys", ...)
+    return call(gateway_addr, api.sysappid, ...)
 end
 
 function api.internal_request(...)
-    return call(gateway_addr, "internal", ...)
+    return call(gateway_addr, api.internalappid, ...)
 end
 
 function api.route_add(source, target, last)

@@ -11,11 +11,11 @@ local limit = 4 -- 15 seconds
 local locked = true
 
 local wsapp_addr, mqttapp_addr = ...
-local wsappid = sys.wsappid
-local mqttappid = sys.mqttappid
-local hostappid = sys.hostappid
-local frpappid = sys.frpappid
-local vpnappid = sys.vpnappid
+local wsappid = api.wsappid
+local mqttappid = api.mqttappid
+local hostappid = api.hostappid
+local frpappid = api.frpappid
+local vpnappid = api.vpnappid
 
 local sysinfo = {}
 local applist = {}
@@ -278,7 +278,7 @@ local function load_app(id, tpl)
             id = name,
             counter = 0
         }
-        log.error(text.load_suc, name)
+        log.info(text.load_suc, name)
         return true
     else
         applist[id] = nil
@@ -301,7 +301,7 @@ local function start_pipe(id)
     end
     pipelist[id].start_time = api.datetime()
     pipelist[id].stop_time = false
-    log.error(text.pipe_start_suc, id)
+    log.info(text.pipe_start_suc, id)
 end
 
 local function stop_pipe(id)
@@ -318,7 +318,7 @@ local function stop_pipe(id)
     end
     pipelist[id].start_time = false
     pipelist[id].stop_time = api.datetime()
-    log.error(text.pipe_stop_suc, id)
+    log.info(text.pipe_stop_suc, id)
 end
 
 local function try_start_pipe(id, auto)
@@ -356,7 +356,7 @@ local function load_pipe(id, apps)
         stop_time = api.datetime(),
         apps = apps,
     }
-    log.error(text.pipe_load_suc, id)
+    log.info(text.pipe_load_suc, id)
     return true
 end
 
@@ -382,7 +382,7 @@ local function configure_all(arg, nosave)
     local ok, err, tpl, conf
     for id, app in pairs(arg.apps) do
         tpl, conf = next(app)
-        log.error(text.app_conf, tostring(id), tpl, dump(conf))
+        log.info(text.app_conf, tostring(id), tpl, dump(conf))
         if sysapp(id) then
             ok, err = configure_app(id, conf, nosave)
             if not ok then
@@ -528,7 +528,7 @@ function command.clean()
             remove_app(id)
         end
     end
-    log.error(text.cleaned)
+    log.info(text.cleaned)
     return true
 end
 
@@ -556,7 +556,7 @@ function command.configure(arg)
             if applist[id].read_only then
                 ok, err = false, text.app_readonly
             else
-                log.error(text.app_conf, tostring(id), dump(conf))
+                log.info(text.app_conf, tostring(id), dump(conf))
                 ok, err = configure_app(id, conf)
             end
         end

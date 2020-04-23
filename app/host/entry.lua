@@ -46,7 +46,7 @@ end
 
 local function post_attributes()
     local post = api.post_gattr
-    local key = sys.infokey
+    local key = api.infokey
     while true do
         local info = api.sys_request("info")
         for _, app in pairs(info.apps) do
@@ -66,11 +66,11 @@ function on_conf(cfg)
     end
 
     local ok, err = sys.start_svc(svc)
-    log.error(err)
+    log.info(err)
 
     if ok then
         _, err = sys.enable_svc(svc)
-        log.error(err)
+        log.info(err)
 
         skynet.fork(post_telemetry, tags)
         skynet.fork(post_attributes)
