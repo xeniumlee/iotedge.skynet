@@ -8,8 +8,10 @@ local api = require "api"
 local registered = false
 local vpnconf = "run/vpn.conf"
 local install_cmd = "app/vpn/setup.sh"
+local route_cmd = "ip route"
+local interface_cmd = "ip addr"
 local svc = "vpn"
-local info = {}
+local info = { running = false }
 
 local cfg_schema = {
     eth = validator.string,
@@ -39,34 +41,37 @@ local function install(start, eth)
     return sys.exec_with_return(cmd)
 end
 
-local function append_conf(conf)
-    local f = io.open(vpnconf, "a")
-    f:write(conf..'\n')
-    f:close()
+local function append_pem(k)
+    return function(f, pem)
+        local conf = string.format("<%s>\n%s\n</%s>\n", k, pem, k)
+        f:write(conf)
+    end
 end
 
-local function append_pem(key)
-    return function(pem)
-        local conf = string.format("<%s>\n%s\n</%s>", key, pem, key)
-        append_conf(conf)
+local function append_kv(k)
+    return function(f, v)
+        local conf = string.format("%s %s\n", k, v)
+        f:write(conf)
     end
 end
 
 local conf_map = {
-    proto = function(v) append_conf("proto "..v) end,
-    serverbridge = function(v) append_conf("server-bridge "..v) end,
+    proto = append_kv("proto"),
+    serverbridge = append_kv("server-bridge"),
     ca = append_pem("ca"),
     cert = append_pem("cert"),
     key = append_pem("key")
 }
 
 local function gen_conf(cfg)
+    local file = io.open(vpnconf, "a")
     for k, v in pairs(cfg) do
         local f = conf_map[k]
         if f then
-            f(v)
+            f(file, v)
         end
     end
+    file:close()
 end
 
 local function gen_server_bridge(cfg, ipaddr)
@@ -91,6 +96,39 @@ local function gen_server_bridge(cfg, ipaddr)
     else
         return false
     end
+end
+
+local function gen_route()
+    local r = sys.exec_with_return(route_cmd)
+    local ret = {}
+    if r then
+        for s in r:gmatch("[^\n]+") do
+            table.insert(ret, s)
+        end
+    end
+    return ret
+end
+
+local function gen_interface()
+    local i = sys.exec_with_return(interface_cmd)
+    local ret = {}
+    if i then
+        local key
+        for s in i:gmatch("[^\n]+") do
+            local eth, state = s:match("^%d+:%s+([^:]+):%s+(.+)$")
+            if eth and state then
+                key = eth
+                ret[eth] = {}
+                ret[eth].state = state
+            else
+                local ip = s:match("^%s+inet%s+(%g+)")
+                if ip then
+                    ret[key].addr = ip
+                end
+            end
+        end
+    end
+    return ret
 end
 
 local function refresh_info(cfg)
@@ -130,11 +168,12 @@ local function init_conf(cfg)
 end
 
 function vpn_info()
+    info.routes = gen_route()
+    info.interfaces = gen_interface()
     return info
 end
 
 function on_conf(cfg)
-    reg_cmd()
     if cfg.auto then
         local ok = pcall(validator.check, cfg, cfg_schema)
         if ok then
@@ -153,3 +192,5 @@ function on_conf(cfg)
         return ok
     end
 end
+
+reg_cmd()

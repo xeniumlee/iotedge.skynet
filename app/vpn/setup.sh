@@ -1,7 +1,7 @@
 #!/bin/sh
 
 cmd=$1
-eth=${2}
+eth=$2
 
 br=br0
 tap=tap0
@@ -74,7 +74,7 @@ setup_bridge() {
     fi
 }
 
-if [ ${cmd} = "start" ]; then
+if [ $cmd = "start" ]; then
 
     install_vpn
     setup_tap
@@ -83,7 +83,7 @@ if [ ${cmd} = "start" ]; then
     cp -f app/vpn/vpn.conf run/
     echo -n $eth_ip
 
-elif [ ${cmd} = "stop" ]; then
+elif [ $cmd = "stop" ]; then
 
     ip link show $br >/dev/null 2>&1
     if [ $? -eq 0 ]; then
