@@ -17,7 +17,7 @@ local function print_v(value)
     if type(value) == "boolean" or type(value) == "number" then
         return tostring(value)
     else
-        return "'"..value.."'"
+        return "'"..string.gsub(value, "\n", "\\n").."'"
     end
 end
 

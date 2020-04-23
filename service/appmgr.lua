@@ -228,7 +228,7 @@ local function validate_appconf(arg)
     return tpl, clone(tpllist[tpl], conf)
 end
 
-local function validate_fullconf(arg)
+local function validate_full_conf(arg)
     assert((arg.pipes == nil and arg.apps == nil) or
            (arg.pipes == nil and type(arg.apps) == "table") or
            (type(arg.pipes) == "table" and type(arg.apps) == "table"),
@@ -249,14 +249,20 @@ local function validate_fullconf(arg)
     end
 end
 
-local function validate_conf(arg)
+local function validate_existing_conf(arg)
     if arg.repo then
         validate_repo(arg.repo)
     else
         local name, conf = next(arg)
         assert(type(conf) == "table", text.invalid_arg)
         local id, tpl = validate_appname(name)
-        return id, clone(tpllist[tpl], conf)
+
+        local app = applist[id]
+        if app.conf then
+            return id, clone(app.conf, conf)
+        else
+            return id, clone(tpllist[tpl], conf)
+        end
     end
 end
 
@@ -272,6 +278,7 @@ local function load_app(id, tpl)
             addr = addr,
             load_time = api.datetime(),
             tpl = tpl,
+            conf = false,
             route = {}
         }
         appmonitor[addr] = {
@@ -496,7 +503,7 @@ local function load_all()
     load_sysapp()
 
     local total = api.internal_request("conf_get", "total")
-    local ok, err = pcall(validate_fullconf, total)
+    local ok, err = pcall(validate_full_conf, total)
     if ok then
         ok, err = configure_all(total, true)
         if not ok then
@@ -542,7 +549,7 @@ function command.configure(arg)
     local ok, err
     locked = true
     if type(arg.pipes) == "table" then
-        ok, err = pcall(validate_fullconf, arg)
+        ok, err = pcall(validate_full_conf, arg)
         if ok then
             command.clean()
             skynet.sleep(3000)
@@ -550,7 +557,7 @@ function command.configure(arg)
         end
     else
         local conf
-        ok, err, conf = pcall(validate_conf, arg)
+        ok, err, conf = pcall(validate_existing_conf, arg)
         if ok and err then
             local id = err
             if applist[id].read_only then
