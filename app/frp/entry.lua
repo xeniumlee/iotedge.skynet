@@ -1,11 +1,12 @@
 local skynet = require "skynet"
 local ini = require "utils.inifile"
-local validate = require "utils.validate"
+local validator = require "utils.validator"
 local text = require("text").app
 local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
+local registered = false
 local frpcini = "run/frpc.ini"
 local svc = "frpc"
 
@@ -39,40 +40,28 @@ local proxylist = {
         local_port = sys.ws_port
     },
     vpn = {
-        type = "stcp",
         local_ip = "127.0.0.1",
         local_port = sys.vpn_port
     }
 }
 
 local cfg_schema = {
-    server_addr = function(v)
-        return type(v)=="string" and v:match("^[%d%.]+$")
-    end,
-    server_port = function(v)
-        return math.tointeger(v) and v>0 and v<0xFFFF
-    end,
-    token = function(v)
-        return type(v)=="string" and #v > 0
-    end
+    server_addr = validator.ipv4,
+    server_port = validator.port,
+    token = validator.string
 }
 
 local p_schema = {
-    name = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    type = function(v)
-        return v=="tcp" or v=="udp"
-    end,
-    local_ip = function(v)
-        return type(v)=="string" and v:match("^[%d%.]+$")
-    end,
-    local_port = function(v)
-        return math.tointeger(v) and v>0 and v<0xFFFF
-    end,
-    remote_port = function(v)
-        return math.tointeger(v) and v>0 and v<0xFFFF
-    end
+    name = validator.string,
+    type = function(v) return v=="tcp" or v=="udp" end,
+    local_ip = validator.ipv4,
+    local_port = validator.port,
+    remote_port = validator.port
+}
+
+local vpn_type = {
+    tcp4 = "stcp",
+    udp4 = "sudp"
 }
 
 local cmd_desc = {
@@ -84,15 +73,22 @@ local cmd_desc = {
     close_ws = "Close websocket port",
     open_vpn = "<token>",
     close_vpn = "<token>",
-    open = "{ name=<string>, type=<string>, local_ip=<string>, local_port=<number>, remote_port=<number> }",
-    close = "<name>",
-    list = "list all opened proxy"
+    open_proxy = "{ name=<string>, type=<string>, local_ip=<string>, local_port=<number>, remote_port=<number> }",
+    close_proxy = "<name>",
+    list_proxy = "list all opened proxy"
 }
 
 local function reg_cmd()
-    for k, v in pairs(cmd_desc) do
-        api.reg_cmd(k, v)
+    if not registered then
+        for k, v in pairs(cmd_desc) do
+            api.reg_cmd(k, v)
+        end
+        registered = true
     end
+end
+
+local function get_vpninfo()
+    return api.external_request(sys.vpnappid, "vpn_info")
 end
 
 local function init_conf(cfg)
@@ -134,7 +130,9 @@ local function dup(proxy)
     for name, p in pairs(frpcconf) do
         if proxy.name == name or
            (proxy.type == p.type and
-           proxy.remote_port == p.remote_port) then
+           (proxy.remote_port == p.remote_port or
+            (proxy.local_ip == p.local_ip and proxy.local_port == p.local_port)
+            )) then
             return true
         end
     end
@@ -157,15 +155,15 @@ local function do_close(name)
     return update(name)
 end
 
-function open(proxy)
-    local ok = pcall(validate, proxy, p_schema)
+function open_proxy(proxy)
+    local ok = pcall(validator.check, proxy, p_schema)
     if ok and not dup(proxy) then
         return do_open(proxy)
     else
         return false, text.invalid_arg
     end
 end
-function close(name)
+function close_proxy(name)
     if type(name) == "string" then
         return do_close(name)
     else
@@ -214,9 +212,15 @@ end
 
 function open_vpn(token)
     if type(token) == "string" and not dup_vpn(token) then
-        proxylist.vpn.name = token
-        proxylist.vpn.sk = token
-        return do_open(proxylist.vpn)
+        local vpn = get_vpninfo()
+        if vpn.running then
+            proxylist.vpn.type = vpn_type[vpn.proto]
+            proxylist.vpn.name = token
+            proxylist.vpn.sk = token
+            return do_open(proxylist.vpn)
+        else
+            return false, text.vpn_stopped
+        end
     else
         return false, text.invalid_arg
     end
@@ -229,7 +233,7 @@ function close_vpn(token)
     end
 end
 
-function list()
+function list_proxy()
     local ret = {}
     for k, v in pairs(frpcconf) do
         if k ~= "common" then
@@ -240,7 +244,7 @@ function list()
 end
 
 function on_conf(cfg)
-    local ok = pcall(validate, cfg, cfg_schema)
+    local ok = pcall(validator.check, cfg, cfg_schema)
     if ok then
         return init_conf(cfg)
     else

@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local core = require "skynet.core"
 local api = require "api"
+local sys = require "sys"
 local log = require "log"
 local dump = require "utils.dump"
 local text = require("text").appmgr
@@ -10,11 +11,11 @@ local limit = 4 -- 15 seconds
 local locked = true
 
 local wsapp_addr, mqttapp_addr = ...
-local wsappid = "ws"
-local mqttappid = "mqtt"
-local hostappid = "host"
-local frpappid = "frp"
-local vpnappid = "vpn"
+local wsappid = sys.wsappid
+local mqttappid = sys.mqttappid
+local hostappid = sys.hostappid
+local frpappid = sys.frpappid
+local vpnappid = sys.vpnappid
 
 local sysinfo = {}
 local applist = {}
@@ -44,10 +45,14 @@ local function syspipe(id)
     return id == hostappid
 end
 
-local function make_appinfo(id, app)
+local function make_appinfo(app)
     local info = {}
-    if id ~= hostappid and id ~= vpnappid then
-        info.conf = app.conf
+    if app.conf then
+        if app.name == vpnappid then
+            info.running = app.conf.auto
+        elseif app.name ~= hostappid then
+            info.conf = app.conf
+        end
     end
     info.load_time = app.load_time
     return info
@@ -68,7 +73,7 @@ local function refresh_info()
     local apps = {}
     local name
     for id, app in pairs(applist) do
-        apps[app.name] = make_appinfo(id, app)
+        apps[app.name] = make_appinfo(app)
     end
 
     local pipes = {}

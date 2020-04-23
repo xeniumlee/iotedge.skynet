@@ -1,37 +1,38 @@
 local skynet = require "skynet"
-local validate = require "utils.validate"
+local validator = require "utils.validator"
 local text = require("text").app
 local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
+local registered = false
 local vpnconf = "run/vpn.conf"
 local install_cmd = "app/vpn/setup.sh"
 local svc = "vpn"
+local info = {}
 
 local cfg_schema = {
-    eth = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    proto = function(v)
-        return v=="tcp4" or v=="udp4"
-    end,
-    ca = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    cert = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    key = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    tlsauth = function(v)
-        return type(v)=="string" and #v > 0
-    end,
-    serverbridge = function(v)
-        return type(v)=="string" and #v > 0
-    end
+    eth = validator.string,
+    proto = function(v) return v=="tcp4" or v=="udp4" end,
+    ca = validator.string,
+    cert = validator.string,
+    key = validator.string,
+    tlsauth = validator.string,
+    serverbridge = validator.string
 }
+
+local cmd_desc = {
+    vpn_info = "Show VPN configuration & status",
+}
+
+local function reg_cmd()
+    if not registered then
+        for k, v in pairs(cmd_desc) do
+            api.reg_cmd(k, v)
+        end
+        registered = true
+    end
+end
 
 local function install(start, eth)
     local action = start and "start" or "stop"
@@ -94,6 +95,13 @@ local function gen_server_bridge(cfg, ipaddr)
     end
 end
 
+local function refresh_info(cfg)
+    info.running = cfg.auto
+    info.proto = cfg.proto
+    info.eth = cfg.eth
+    info.pool = cfg.serverbridge
+end
+
 local function init_conf(cfg)
     local ipaddr = install(true, cfg.eth)
     if ipaddr then
@@ -109,6 +117,8 @@ local function init_conf(cfg)
                     _, err = sys.enable_svc(svc)
                     log.error(err)
                 end
+                refresh_info(cfg)
+
                 return ok
             else
                 return false, text.conf_fail
@@ -121,9 +131,14 @@ local function init_conf(cfg)
     end
 end
 
+function vpn_info()
+    return info
+end
+
 function on_conf(cfg)
+    reg_cmd()
     if cfg.auto then
-        local ok = pcall(validate, cfg, cfg_schema)
+        local ok = pcall(validator.check, cfg, cfg_schema)
         if ok then
             return init_conf(cfg)
         else
@@ -136,6 +151,7 @@ function on_conf(cfg)
         _, err = sys.disable_svc(svc)
         log.error(err)
 
+        refresh_info(cfg)
         return ok
     end
 end

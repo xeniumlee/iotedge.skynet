@@ -16,6 +16,7 @@
 - [x] Log rotate
 - [x] Proxy support by FRP
 - [x] Monitor by NodeExporter
+- [x] VPN by OpenVPN
 - [x] Modbus TCP/RTU(ASCII)/RTU(ASCII) over TCP
 - [x] Simens S7
 - [x] Kafka publisher

@@ -2,7 +2,7 @@ local skynet = require "skynet"
 local log = require "log"
 local text = require("text").modbus
 local api = require "api"
-local validate = require "utils.validate"
+local validator = require "utils.validator"
 local client = require "modbus.client"
 local mpdu = require "modbus.pdu"
 local mdata = require "modbus.data"
@@ -34,8 +34,11 @@ local cmd_desc = {
 }
 
 local function reg_cmd()
-    for k, v in pairs(cmd_desc) do
-        api.reg_cmd(k, v)
+    if not registered then
+        for k, v in pairs(cmd_desc) do
+            api.reg_cmd(k, v)
+        end
+        registered = true
     end
 end
 
@@ -430,35 +433,31 @@ local tag_schema = {
     fc = function(v)
         return v==1 or v==2 or v==3 or v==4 or v==5 or v==15 or v==6 or v==16
     end,
-    bit = function(v)
-        return v==nil or (math.tointeger(v) and v>=1 and v<=16)
-    end,
-    addr = function(v)
-        return math.tointeger(v) and v>=MODBUS_ADDR_MIN and v<=MODBUS_ADDR_MAX
-    end,
-    number = function(v)
-        return math.tointeger(v) and v>0
-    end,
     dt = function(v)
         return v=="int" or v=="uint" or v=="string" or v=="float" or v=="boolean"
     end,
     mode = function(v)
         return v=="ts" or v=="attr" or v=="ctrl"
     end,
-    cov  = function(v)
-        return v==nil or type(v)=="boolean"
+    addr = validator.minmaxint(MODBUS_ADDR_MIN, MODBUS_ADDR_MAX),
+    number = validator.posint,
+    bit = function(v)
+        return v==nil or validator.minmaxint(1, 16)(v)
+    end,
+    cov = function(v)
+        return v==nil or validator.boolean(v)
     end,
     le = function(v)
-        return v==nil or type(v)=="boolean"
+        return v==nil or validator.boolean(v)
     end,
     poll = function(v)
-        return v==nil or (math.tointeger(v) and v>=poll_min and v<=poll_max)
+        return v==nil or validator.minmaxint(poll_min, poll_max)(v)
     end,
     gain = function(v)
-        return v==nil or type(v)=="number"
+        return v==nil or validator.number(v)
     end,
     offset = function(v)
-        return v==nil or type(v)=="number"
+        return v==nil or validator.number(v)
     end
 }
 
@@ -483,7 +482,7 @@ local function validate_tags(dev, tle)
 
     for name, t in pairs(dev.tags) do
         assert(type(name)=="string", text.invalid_tag_conf)
-        local ok = pcall(validate, t, tag_schema)
+        local ok = pcall(validator.check, t, tag_schema)
         assert(ok, text.invalid_tag_conf)
 
         if t.gain then
@@ -517,23 +516,15 @@ local function validate_tags(dev, tle)
 end
 
 local d_schema = {
-    unitid = function(v)
-        return math.tointeger(v) and v>=MODBUS_SLAVE_MIN and v<=MODBUS_SLAVE_MAX
-    end,
-    attr_poll = function(v)
-        return math.tointeger(v) and v>=poll_min and v<=poll_max
-    end,
-    ts_poll = function(v)
-        return math.tointeger(v) and v>=poll_min and v<=poll_max
-    end,
-    le = function(v)
-        return type(v)=="boolean"
-    end,
+    unitid = validator.minmaxint(MODBUS_SLAVE_MIN, MODBUS_SLAVE_MAX),
+    attr_poll = validator.minmaxint(poll_min, poll_max),
+    ts_poll = validator.minmaxint(poll_min, poll_max),
+    le = validator.boolean,
     retention = function(v)
-        return v==nil or (math.tointeger(v) and v>0 and v<=api.ttl_max)
+        return v==nil or (validator.minmaxint(0, api.ttl_max)(v) and v~=0)
     end,
     batch = function(v)
-        return v==nil or (math.tointeger(v) and v>0 and v<=api.batch_max)
+        return v==nil or (validator.minmaxint(0, api.batch_max)(v) and v~=0)
     end
 }
 
@@ -542,7 +533,7 @@ local function validate_devices(d, tle)
     local max = 0
     for name, dev in pairs(d) do
         assert(type(name)=="string", text.invalid_device_conf)
-        local ok = pcall(validate, dev, d_schema)
+        local ok = pcall(validator.check, dev, d_schema)
         assert(ok, text.invalid_device_conf)
 
         local addrlist, max_poll = validate_tags(dev, tle)
@@ -613,56 +604,32 @@ local t_schema = {
     mode = function(v)
         return v=="rtu" or v=="rtu_tcp" or v=="tcp"
     end,
-    le = function(v)
-        return type(v)=="boolean"
-    end,
-    timeout = function(v)
-        return math.tointeger(v) and v>=poll_min
-    end,
-    ascii = function(v)
-        return v==nil or type(v)=="boolean"
-    end,
+    le = validator.boolean,
+    timeout = validator.minint(poll_min),
+    ascii = validator.boolean,
     tcp = {
-        host = function(v)
-            return type(v)=="string" and v:match("^[%d%.]+$")
-        end,
-        port = function(v)
-            return math.tointeger(v) and v>0 and v<0xFFFF
-        end
+        host = validator.ipv4,
+        port = validator.port
     },
     rtu = {
-        port = function(v)
-            return type(v)=="string"
-        end,
-        baudrate = function(v)
-            return math.tointeger(v) and v>0
-        end,
+        port = validator.string,
+        baudrate = validator.posint,
+        databits = validator.posint,
+        stopbits = validator.minint(0),
+        rtscts = validator.boolean,
+        r_timeout = validator.posint,
+        b_timeout = validator.posint,
         mode = function(v)
             return v=="rs232" or v=="rs485"
         end,
-        databits = function(v)
-            return math.tointeger(v) and v>0
-        end,
         parity = function(v)
             return v=="none" or v=="odd" or v=="even"
-        end,
-        stopbits = function(v)
-            return math.tointeger(v) and v>=0
-        end,
-        rtscts = function(v)
-            return type(v)=="boolean"
-        end,
-        r_timeout = function(v)
-            return math.tointeger(v) and v>0
-        end,
-        b_timeout = function(v)
-            return math.tointeger(v) and v>0
         end
     }
 }
 
 local function config_transport(t)
-    local ok = pcall(validate, t, t_schema)
+    local ok = pcall(validator.check, t, t_schema)
     if not ok then
         return false
     else
@@ -698,10 +665,7 @@ function on_conf(conf)
     if config_transport(conf.transport) then
         local ok, err = config_devices(conf.devices, conf.transport.le)
         if ok then
-            if not registered then
-                reg_cmd()
-                registered = true
-            end
+            reg_cmd()
             return ok
         else
             return ok, err

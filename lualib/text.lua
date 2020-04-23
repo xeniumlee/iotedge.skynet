@@ -15,6 +15,7 @@ local text = {
         invalid_conf = "invalid configuration",
         conf_fail = "configure failed",
         install_fail = "install failed",
+        vpn_stopped = "VPN server stopped"
     },
     store = {
         open_suc = "DB opened",

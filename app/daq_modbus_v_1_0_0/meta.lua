@@ -5,11 +5,11 @@ conf = {
         timeout = 500,    -- response timeout, ms
         mode = 'tcp',     -- "tcp" "rtu" "rtu_tcp"
         tcp = {
-            host = '',
-            port = 0,
+            host = '127.0.0.1',
+            port = 30000,
         },
         rtu = {
-            port = '',
+            port = '/dev/ttyS',
             baudrate = 19200,
             mode = 'rs232',    -- "rs232" "rs485"
             databits = 8,
