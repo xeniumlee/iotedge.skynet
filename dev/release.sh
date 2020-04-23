@@ -40,7 +40,7 @@ if [ -n "${PLAT}" ]; then
         INFO=PLATFORM
         echo -n ${REV}-${PLAT} > ${INFO}
 
-        LUADIRS="lualib skynet/lualib service skynet/service app/host app/frp"
+        LUADIRS="lualib skynet/lualib service skynet/service app/host app/frp app/vpn"
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
@@ -63,7 +63,7 @@ if [ -n "${PLAT}" ]; then
 
         for APP in app/*; do
             BASE=$(basename ${APP})
-            if [ ${BASE} != "host" ] && [ ${BASE} != "frp" ]; then
+            if [ ${BASE} != "host" ] && [ ${BASE} != "frp" ] && [ ${BASE} != "vpn" ]; then
                 compile ${APP}
 
                 TARBALL=${RELEASE_DIR}/v_${BASE#*_v_}.tar.gz
