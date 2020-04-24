@@ -369,19 +369,20 @@ end
 
 local function configure_app(id, conf, nosave)
     local a = applist[id]
+    log.info(text.app_conf, a.name, "\n", dump(conf))
+
     local ok, ret, err = pcall(skynet.call, a.addr, "lua", "conf", conf)
-    if ok then
-        if ret then
-            a.conf = conf
-            if not nosave and not a.read_only then
-                update_app(id)
-            end
-            return ret
-        else
-            return ret, err
+    if ok and ret then
+        a.conf = conf
+        if not nosave and not a.read_only then
+            update_app(id)
         end
+        return true
     else
-        return ok, ret
+        err = ok and err or ret
+        err = string.format("%s(%s)", err, a.name)
+        log.error(text.conf_fail, err)
+        return false, err
     end
 end
 
@@ -389,7 +390,6 @@ local function configure_all(arg, nosave)
     local ok, err, tpl, conf
     for id, app in pairs(arg.apps) do
         tpl, conf = next(app)
-        log.info(text.app_conf, tostring(id), tpl, dump(conf))
         if sysapp(id) then
             ok, err = configure_app(id, conf, nosave)
             if not ok then
@@ -505,10 +505,7 @@ local function load_all()
     local total = api.internal_request("conf_get", "total")
     local ok, err = pcall(validate_full_conf, total)
     if ok then
-        ok, err = configure_all(total, true)
-        if not ok then
-            log.error(text.conf_fail, err)
-        end
+        configure_all(total, true)
     else
         log.error(text.conf_fail, err)
     end
@@ -563,7 +560,6 @@ function command.configure(arg)
             if applist[id].read_only then
                 ok, err = false, text.app_readonly
             else
-                log.info(text.app_conf, tostring(id), dump(conf))
                 ok, err = configure_app(id, conf)
             end
         end

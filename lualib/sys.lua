@@ -121,7 +121,7 @@ end
 
 ------------------------------------------
 local function handle_svc(cmd, svc)
-    local c = string.format("systemctl %s %s", cmd, svc)
+    local c = string.format("systemctl %s %s >/dev/null 2>&1", cmd, svc)
     local suc = string.format("%s %s successfully", cmd, svc)
     local fail = string.format("%s %s failed", cmd, svc)
     local ok  = execute(c)

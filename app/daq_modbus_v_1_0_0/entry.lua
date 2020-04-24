@@ -19,7 +19,6 @@ local MODBUS_MAX_READ_REGISTERS = 125
 
 local cli
 local cli_pack
-local registered = false
 local running = false
 local max_wait = 100 * 60 -- 1 min
 local poll_min = 10 -- ms
@@ -34,11 +33,8 @@ local cmd_desc = {
 }
 
 local function reg_cmd()
-    if not registered then
-        for k, v in pairs(cmd_desc) do
-            api.reg_cmd(k, v)
-        end
-        registered = true
+    for k, v in pairs(cmd_desc) do
+        api.reg_cmd(k, v)
     end
 end
 
@@ -665,7 +661,6 @@ function on_conf(conf)
     if config_transport(conf.transport) then
         local ok, err = config_devices(conf.devices, conf.transport.le)
         if ok then
-            reg_cmd()
             return ok
         else
             return ok, err
@@ -678,3 +673,5 @@ end
 function on_exit()
     stop()
 end
+
+reg_cmd()

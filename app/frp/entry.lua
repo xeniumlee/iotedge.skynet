@@ -6,7 +6,7 @@ local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
-local registered = false
+local running = false
 local frpcini = "run/frpc.ini"
 local svc = "frpc"
 
@@ -79,11 +79,8 @@ local cmd_desc = {
 }
 
 local function reg_cmd()
-    if not registered then
-        for k, v in pairs(cmd_desc) do
-            api.reg_cmd(k, v)
-        end
-        registered = true
+    for k, v in pairs(cmd_desc) do
+        api.reg_cmd(k, v)
     end
 end
 
@@ -109,7 +106,7 @@ local function init_conf(cfg)
         _, err = sys.enable_svc(svc)
         log.info(err)
 
-        reg_cmd()
+        running = true
     end
     return ok
 end
@@ -156,6 +153,9 @@ local function do_close(name)
 end
 
 function open_proxy(proxy)
+    if not running then
+        return false, text.app_stopped
+    end
     local ok = pcall(validator.check, proxy, p_schema)
     if ok and not dup(proxy) then
         return do_open(proxy)
@@ -164,6 +164,9 @@ function open_proxy(proxy)
     end
 end
 function close_proxy(name)
+    if not running then
+        return false, text.app_stopped
+    end
     if type(name) == "string" then
         return do_close(name)
     else
@@ -172,6 +175,9 @@ function close_proxy(name)
 end
 
 function open_console(port)
+    if not running then
+        return false, text.app_stopped
+    end
     local p = tonumber(port)
     if p then
         proxylist.console.remote_port = p
@@ -181,10 +187,16 @@ function open_console(port)
     end
 end
 function close_console()
+    if not running then
+        return false, text.app_stopped
+    end
     return do_close(proxylist.console.name)
 end
 
 function open_ssh(port)
+    if not running then
+        return false, text.app_stopped
+    end
     local p = tonumber(port)
     if p then
         proxylist.ssh.remote_port = p
@@ -194,10 +206,16 @@ function open_ssh(port)
     end
 end
 function close_ssh()
+    if not running then
+        return false, text.app_stopped
+    end
     return do_close(proxylist.ssh.name)
 end
 
 function open_ws(port)
+    if not running then
+        return false, text.app_stopped
+    end
     local p = tonumber(port)
     if p then
         proxylist.ws.remote_port = p
@@ -207,10 +225,16 @@ function open_ws(port)
     end
 end
 function close_ws()
+    if not running then
+        return false, text.app_stopped
+    end
     return do_close(proxylist.ws.name)
 end
 
 function open_vpn(token)
+    if not running then
+        return false, text.app_stopped
+    end
     if type(token) == "string" and not dup_vpn(token) then
         local vpn = get_vpninfo()
         if vpn.running then
@@ -226,6 +250,9 @@ function open_vpn(token)
     end
 end
 function close_vpn(token)
+    if not running then
+        return false, text.app_stopped
+    end
     if type(token) == "string" then
         return do_close(token)
     else
@@ -234,6 +261,9 @@ function close_vpn(token)
 end
 
 function list_proxy()
+    if not running then
+        return false, text.app_stopped
+    end
     local ret = {}
     for k, v in pairs(frpcconf) do
         if k ~= "common" then
@@ -251,3 +281,5 @@ function on_conf(cfg)
         return false, text.invalid_conf
     end
 end
+
+reg_cmd()

@@ -5,7 +5,6 @@ local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
-local registered = false
 local vpnconf = "run/vpn.conf"
 local install_cmd = "app/vpn/setup.sh"
 local route_cmd = "ip route"
@@ -27,11 +26,8 @@ local cmd_desc = {
 }
 
 local function reg_cmd()
-    if not registered then
-        for k, v in pairs(cmd_desc) do
-            api.reg_cmd(k, v)
-        end
-        registered = true
+    for k, v in pairs(cmd_desc) do
+        api.reg_cmd(k, v)
     end
 end
 
@@ -42,16 +38,14 @@ local function install(start, eth)
 end
 
 local function append_pem(k)
-    return function(f, pem)
-        local conf = string.format("<%s>\n%s\n</%s>\n", k, pem, k)
-        f:write(conf)
+    return function(pem)
+        return string.format("<%s>\n%s\n</%s>\n", k, pem, k)
     end
 end
 
 local function append_kv(k)
-    return function(f, v)
-        local conf = string.format("%s %s\n", k, v)
-        f:write(conf)
+    return function(v)
+        return string.format("%s %s\n", k, v)
     end
 end
 
@@ -65,12 +59,14 @@ local conf_map = {
 
 local function gen_conf(cfg)
     local file = io.open(vpnconf, "a")
+    local conf = ""
     for k, v in pairs(cfg) do
         local f = conf_map[k]
         if f then
-            f(file, v)
+            conf = conf..f(v)
         end
     end
+    file:write(conf)
     file:close()
 end
 
