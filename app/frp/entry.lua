@@ -7,7 +7,7 @@ local sys = require "sys"
 local api = require "api"
 
 local running = false
-local frpcini = "run/frpc.ini"
+local frpcini = sys.run_root.."/frpc.ini"
 local svc = "frpc"
 
 local frpcconf = {

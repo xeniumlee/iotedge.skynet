@@ -40,7 +40,7 @@
 * telnet localhost 30000
 * Type help
 ### Production
-* Check scripts/release.sh & scripts/install.sh
+* Check dev/release.sh & scripts/install.sh
 ## Dependences
 * github.com/cloudwu/lua-cjson
 * github.com/keplerproject/luafilesystem
