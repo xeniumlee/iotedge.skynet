@@ -5,7 +5,9 @@ local text = require("text").console
 local regex = require("text").regex
 
 local ip = "127.0.0.1"
-local port = ...
+local port, auth_enabled = ...
+auth_enabled = auth_enabled == "true"
+
 local connections = 0
 local max = 1
 local fds = {}
@@ -128,7 +130,7 @@ skynet.start(function()
         if running then
             if connections < max then
                 socket.start(fd)
-                if auth(fd) then
+                if not auth_enabled or auth(fd) then
                     fds[fd] = true
                     connections = connections + 1
                     skynet.fork(console_main_loop, fd)

@@ -7,7 +7,8 @@ local seri = require "seri"
 local log = require "log"
 local text = require("text").console
 
-local port = ...
+local port, auth_enabled = ...
+auth_enabled = auth_enabled == "true"
 
 local protocol = "ws"
 local connected = false
@@ -80,7 +81,7 @@ function handle.close(fd, code, reason)
 end
 
 function handle.message(fd, msg)
-    if not authed then
+    if auth_enabled and not authed then
         local user, pass = decode_auth(msg)
         if user then
             authed = api.internal_request("auth", {user, pass})

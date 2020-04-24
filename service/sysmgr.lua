@@ -182,17 +182,13 @@ local userpass
 local command = {}
 
 function command.auth(arg)
-    if cfg.auth.enabled then
-        local username = arg[1]
-        local password = arg[2]
-        if type(username) == "string" and type(password) == "string" then
-            return md5.sumhexa(username) == cfg.auth.username and
-            crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
-        else
-            return false
-        end
+    local username = arg[1]
+    local password = arg[2]
+    if type(username) == "string" and type(password) == "string" then
+        return md5.sumhexa(username) == cfg.auth.username and
+        crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
     else
-        return true
+        return false
     end
 end
 
@@ -452,10 +448,16 @@ local function launch()
     skynet.name(api.store_addr, cfg.store)
     log.info("Store started")
 
-    cfg.gateway_console = skynet.uniqueservice("gateway_console", sys.console_port)
+    cfg.gateway_console = skynet.uniqueservice(
+        "gateway_console",
+        sys.console_port,
+        tostring(cfg.auth.enabled))
     log.info("Console started")
 
-    cfg.gateway_ws = skynet.uniqueservice("gateway_ws", sys.ws_port)
+    cfg.gateway_ws = skynet.uniqueservice(
+        "gateway_ws",
+        sys.ws_port,
+        tostring(cfg.auth.enabled))
     log.info("Websocket started")
 
     if cfg.gateway_mqtt then
