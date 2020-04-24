@@ -181,7 +181,9 @@ skynet.start(function()
         flowcontrol = conf.flowcontrol
         if math.tointeger(flowcontrol) and flowcontrol>0 then
             skynet.dispatch("lua", function(_, addr, cmd, ...)
-                if req_num < flowcontrol then
+                if applist[addr] then
+                    command[cmd](addr, ...)
+                elseif req_num < flowcontrol then
                     req_num = req_num + 1
                     command[cmd](addr, ...)
                     req_num = req_num - 1

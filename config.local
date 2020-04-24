@@ -5,6 +5,7 @@ sys = {
     cluster = 30002
 }
 auth = {
+    enabled = true,
     username = '9c1d55b6274a7456540ec64bb39cd604',
     password = 'c41441edb82f7d3461925a3385c98501',
 }

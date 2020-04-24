@@ -182,13 +182,17 @@ local userpass
 local command = {}
 
 function command.auth(arg)
-    local username = arg[1]
-    local password = arg[2]
-    if type(username) == "string" and type(password) == "string" then
-        return md5.sumhexa(username) == cfg.auth.username and
-        crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
+    if cfg.auth.enabled then
+        local username = arg[1]
+        local password = arg[2]
+        if type(username) == "string" and type(password) == "string" then
+            return md5.sumhexa(username) == cfg.auth.username and
+            crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
+        else
+            return false
+        end
     else
-        return false
+        return true
     end
 end
 
@@ -370,11 +374,11 @@ function command.upgrade(version)
         end
     end)
     if ok then
+        local c_total = skynet.unpack(skynet.pack(total_conf()))
         skynet.timeout(0, function()
             local c_dir = lfs.currentdir()
             local c_conf = skynet.getenv("cfg")
             local t_port = cluster_port() + 1
-            local c_total = skynet.unpack(skynet.pack(total_conf()))
 
             skynet.call(cfg.appmgr, "lua", "clean", true)
             skynet.send(cfg.store, "lua", "stop")
@@ -464,7 +468,6 @@ local function launch()
     skynet.monitor("appmgr", true)
     log.info("Monitor started")
 
-    --skynet.uniqueservice("debug_console", 12345)
     log.info("System started:", cfg.sys.id, cfg.sys.version)
 end
 
