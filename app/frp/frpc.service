@@ -5,8 +5,8 @@ After=network.target
 
 [Service]
 WorkingDirectory=WORKING_DIR
-ExecStart=WORKING_DIR/bin/prebuilt/frpc -c WORKING_DIR/run/frpc.ini
-ExecReload=WORKING_DIR/bin/prebuilt/frpc reload -c WORKING_DIR/run/frpc.ini
+ExecStart=WORKING_DIR/bin/prebuilt/frpc -c ./run/frpc.ini
+ExecReload=WORKING_DIR/bin/prebuilt/frpc reload -c ./run/frpc.ini
 RestartSec=5s
 Restart=on-failure
 

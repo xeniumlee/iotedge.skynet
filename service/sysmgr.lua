@@ -327,6 +327,22 @@ local function configure(port, conf)
     end
 end
 
+local function launch_delay()
+    if sys.prod() then
+        skynet.sleep(6000) -- delayed for wan up
+    else
+        skynet.sleep(1) -- delayed for logger up
+    end
+end
+
+local function clean_delay()
+    skynet.sleep(1000)
+end
+
+local function upgrade_delay()
+    skynet.sleep(7000)
+end
+
 function command.upgrade(version)
     local tarball = sys.app_tarball(version)
     local tar = http.get(sys.app_uri(cfg.repo.uri, cfg.sys.platform)..tarball, cfg.repo.auth, 60000)
@@ -368,16 +384,18 @@ function command.upgrade(version)
             if cfg.gateway_mqtt then
                 skynet.send(cfg.gateway_mqtt_addr, "lua", "stop")
             end
-            skynet.sleep(1000)
+            clean_delay()
 
             lfs.chdir(t_dir)
             ok = sys.upgrade(c_dir, c_conf, t_port)
             lfs.chdir(c_dir)
             if not ok then
                 log.error(text.install_fail)
+                return
             end
 
-            skynet.sleep(8000)
+            upgrade_delay()
+
             local err
             ok, err = pcall(configure, t_port, c_total)
             if ok then
@@ -411,11 +429,7 @@ local cmd_desc = {
 }
 
 local function launch()
-    if sys.prod() then
-        skynet.sleep(6000) -- delayed for wan up
-    else
-        skynet.sleep(1) -- delayed for logger up
-    end
+    launch_delay()
 
     load_all()
     init_auth()

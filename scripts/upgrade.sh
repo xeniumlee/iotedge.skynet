@@ -10,8 +10,10 @@ REV=${REVPLAT%-*}
 
 cp -f $DIR/${CONFIG} ./
 cp -rf $DIR/db ./
+
+mkdir -p ./run
+rm -f ./run/*
 if [ -f $DIR/run/frpc.ini ]; then
-    mkdir run
     cp -f $DIR/run/frpc.ini ./run/
 fi
 

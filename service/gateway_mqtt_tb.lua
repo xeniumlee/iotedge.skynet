@@ -335,10 +335,8 @@ end
 
 local req_map = {
     open_console = api.frpappid,
-    open_ssh = api.frpappid,
-    open_ws = api.frpappid,
     open_vpn = api.frpappid,
-    open_proxy = api.frpappid,
+    close_vpn = api.frpappid,
     vpn_info = api.vpnappid,
     upgrade = api.sysappid
 }

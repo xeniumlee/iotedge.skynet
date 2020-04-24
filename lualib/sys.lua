@@ -141,7 +141,7 @@ function sys.disable_svc(svc)
 end
 
 function sys.start_svc(svc)
-    return handle_svc("start", svc)
+    return handle_svc("restart", svc)
 end
 
 function sys.stop_svc(svc)
