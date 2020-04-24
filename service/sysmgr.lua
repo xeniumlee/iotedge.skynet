@@ -376,7 +376,7 @@ function command.upgrade(version)
             local t_port = cluster_port() + 1
             local c_total = skynet.unpack(skynet.pack(total_conf()))
 
-            skynet.call(cfg.appmgr, "lua", "clean")
+            skynet.call(cfg.appmgr, "lua", "clean", true)
             skynet.send(cfg.store, "lua", "stop")
             skynet.send(cfg.gateway_console, "lua", "stop")
             skynet.send(cfg.gateway_ws, "lua", "stop")

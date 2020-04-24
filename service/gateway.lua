@@ -9,6 +9,18 @@ local command = {}
 local devlist = {}
 local applist = {}
 
+local audit = false
+local flowcontrol = false
+local req_num = 0
+local req_fmt = "[%s] from [%s] to [%s] total [%d]"
+
+local function log_req(cmd, from, dev)
+    if audit then
+        local req_from = applist[from] and applist[from].name or "EXTERNAL"
+        log.info(text.new_request, string.format(req_fmt, cmd, req_from, dev, req_num))
+    end
+end
+
 local function help()
     local ret = {}
     for k, v in pairs(devlist) do
@@ -132,6 +144,7 @@ setmetatable(command, { __index = function(t, dev)
             if cmdlist then
                 f = function(addr, cmd, arg)
                     if cmdlist[cmd] then
+                        log_req(cmd, addr, dev)
                         local ok, ret, err = pcall(skynet.call, d.addr, "lua", cmd, dev, arg)
                         if ok then
                             if err ~= nil then
@@ -164,9 +177,23 @@ end})
 skynet.start(function()
     local conf = skynet.call(sysmgr_addr, "lua", "conf_get", "internal", "gateway")
     if conf then
-        skynet.dispatch("lua", function(_, addr, cmd, ...)
-            command[cmd](addr, ...)
-        end)
+        audit = conf.audit
+        flowcontrol = conf.flowcontrol
+        if math.tointeger(flowcontrol) and flowcontrol>0 then
+            skynet.dispatch("lua", function(_, addr, cmd, ...)
+                if req_num < flowcontrol then
+                    req_num = req_num + 1
+                    command[cmd](addr, ...)
+                    req_num = req_num - 1
+                else
+                    skynet.ret(skynet.pack(false, text.busy))
+                end
+            end)
+        else
+            skynet.dispatch("lua", function(_, addr, cmd, ...)
+                command[cmd](addr, ...)
+            end)
+        end
     else
         log.error(text.no_conf)
     end

@@ -109,6 +109,8 @@ local text = {
         dup_cmd = "CMD name already used",
         cmd_registered = "new CMD registered",
         no_conf = "not configured",
+        new_request = "new REQUEST",
+        busy = "busy"
     },
     console = {
         prompt = ">> ",

@@ -90,10 +90,12 @@ local function update_app(id)
     refresh_info()
 end
 
-local function remove_app(id)
+local function remove_app(id, nosave)
     local app = applist[id]
     skynet.send(app.addr, "lua", "exit")
-    api.internal_request("update_app", { id, app.tpl, false })
+    if not nosave then
+        api.internal_request("update_app", { id, app.tpl, false })
+    end
     applist[id] = nil
     refresh_info()
 end
@@ -518,18 +520,20 @@ function command.apps()
     return tpllist
 end
 
-function command.clean()
+function command.clean(nosave)
     for id, _ in pairs(pipelist) do
         if not syspipe(id) then
             stop_pipe(id)
             pipelist[id] = nil
         end
     end
-    update_pipes()
+    if not nosave then
+        update_pipes()
+    end
 
     for id, _ in pairs(applist) do
         if not sysapp(id) then
-            remove_app(id)
+            remove_app(id, nosave)
         end
     end
     log.info(text.cleaned)

@@ -10,8 +10,8 @@ auth = {
     password = 'c41441edb82f7d3461925a3385c98501',
 }
 gateway = {
-    flowcontrol = false,
-    audit = false
+    flowcontrol = 10,
+    audit = true
 }
 gateway_mqtt = {
     tpl = 'gateway_mqtt_tb',
