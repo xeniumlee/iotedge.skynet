@@ -7,6 +7,7 @@ local seri = require "seri"
 local log = require "log"
 local text = require("text").console
 
+local ip = "127.0.0.1"
 local port, auth_enabled = ...
 auth_enabled = auth_enabled == "true"
 
@@ -132,7 +133,7 @@ end
 skynet.start(function()
     local running = true
     seri.init("json")
-    local listen_socket = socket.listen("0.0.0.0", port)
+    local listen_socket = socket.listen(ip, port)
 
     socket.start(listen_socket, function(fd, addr)
         if running and not connected then
