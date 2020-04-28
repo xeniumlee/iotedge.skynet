@@ -26,7 +26,7 @@ namespace snap7 {
             bool ok = (ret == 0);
             return std::make_tuple(ok, CliErrorText(ret));
         }
-        auto Read(const sol::table DataItem) {
+        auto Read(sol::table DataItem) {
             int area = DataItem["area"];
             int dbnumber = DataItem["dbnumber"];
             int start = DataItem["start"];
@@ -38,6 +38,7 @@ namespace snap7 {
             int ret = TS7Client::ReadArea(area, dbnumber, start, amount, wordlen, data);
             if (ret == 0) {
                 std::string s(static_cast<const char*>(data), len);
+                DataItem["value"] = s;
                 skynet_free(data);
             } else {
                 skynet_free(data);
