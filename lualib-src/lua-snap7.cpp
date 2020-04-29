@@ -32,19 +32,18 @@ namespace snap7 {
             int start = DataItem["start"];
             int amount = DataItem["amount"];
             int wordlen = DataItem["wordlen"];
-            size_t len = buffer_size(wordlen, amount);
+            size_t len = DataItem["len"];
             void *data = skynet_malloc(len);
 
             int ret = TS7Client::ReadArea(area, dbnumber, start, amount, wordlen, data);
             if (ret == 0) {
                 std::string s(static_cast<const char*>(data), len);
-                DataItem["value"] = s;
                 skynet_free(data);
+                return std::make_tuple(true, s);
             } else {
                 skynet_free(data);
+                return std::make_tuple(false, CliErrorText(ret));
             }
-            bool ok = (ret == 0);
-            return std::make_tuple(ok, CliErrorText(ret));
         }
         auto Write(const sol::table DataItem) {
             int area = DataItem["area"];
@@ -70,23 +69,6 @@ namespace snap7 {
             return info;
         }
     private:
-        size_t buffer_size(int wordlen, int amount) {
-            switch (wordlen)
-            {
-              case S7WLBit:
-              case S7WLByte:
-                  return 1 * amount;
-              case S7WLWord:
-              case S7WLCounter:
-              case S7WLTimer:
-                  return 2 * amount;
-              case S7WLDWord:
-              case S7WLReal:
-                  return 4 * amount;
-              default:
-                  return 1 * amount;
-            }
-        }
         std::string plc_status(int status) {
             switch (status)
             {

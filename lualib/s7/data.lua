@@ -1,6 +1,7 @@
 local strpack = string.pack
 local strunpack = string.unpack
 local strrep = string.rep
+local strsub = string.sub
 
 local err = {
     invalid_area = "invalid area",
@@ -8,8 +9,7 @@ local err = {
     invalid_datatype = "invalid datatype",
     invalid_number = "invalid number",
     invalid_bit = "invalid bit",
-    invalid_string = "invalid string",
-    invalid_value = "invalid value"
+    invalid_string = "invalid string"
 }
 
 local area_map = {
@@ -110,19 +110,30 @@ local function calc_len(dt, opt)
     end
 end
 
+local function calc_amount(area, len)
+    if area == "TM" or area == "CT" then
+        return math.ceil(len/2)
+    else
+        return len
+    end
+end
+
 return function(area, dbnumber, addr, dt, opt)
     if area == "DB" then
         assert(dbnumber, err.invalid_dbnumber)
     end
     local a = assert(area_map[area], err.invalid_area)
     local d = assert(dt_map[dt], err.invalid_datatype)
+    local l = calc_len(dt, opt)
     local r = {
         area = a.id,
         dbnumber = dbnumber or 0,
         start = calc_start(addr, dt, opt),
-        amount = calc_len(dt, opt),
+        len = l,
+        amount = calc_amount(area, l),
         wordlen = d.wl or a.wl
     }
+
     local w
     if dt == "bool" then
         w = function(val)
@@ -162,19 +173,22 @@ return function(area, dbnumber, addr, dt, opt)
             }
         end
     end
-    local u
+
+    local u, u_bool
     if dt == "bool" then
-        u = function(val)
-            assert(type(val) == "string", err.invalid_value)
-            local v = strunpack(d.fmt, val)
+        u = function(index, val)
+            local v = strunpack(d.fmt, strsub(val, index, index+l-1))
             return v == 1
         end
+        u_bool = function(index, val)
+            local v = strunpack(d.fmt, strsub(val, index, index+l-1))
+            return ((1<<d.opt) & v) ~= 0
+        end
     else
-        u = function(val)
-            assert(type(val) == "string", err.invalid_value)
-            local v = strunpack(d.fmt, val)
+        u = function(index, val)
+            local v = strunpack(d.fmt, strsub(val, index, index+l-1))
             return v
         end
     end
-    return { read = r, write = w , unpack = u }
+    return r, w, u, u_bool
 end
