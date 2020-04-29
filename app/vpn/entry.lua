@@ -14,7 +14,7 @@ local info = { running = false }
 
 local cfg_schema = {
     eth = validator.string,
-    proto = function(v) return v=="tcp4" or v=="udp4" end,
+    proto = validator.vals("tcp4", "udp4"),
     ca = validator.string,
     cert = validator.string,
     key = validator.string,

@@ -48,12 +48,13 @@ local proxylist = {
 local cfg_schema = {
     server_addr = validator.ipv4,
     server_port = validator.port,
-    token = validator.string
+    token = validator.string,
+    protocol = validator.vals("tcp", "kcp")
 }
 
 local p_schema = {
     name = validator.string,
-    type = function(v) return v=="tcp" or v=="udp" end,
+    type = validator.vals("tcp", "udp"),
     local_ip = validator.ipv4,
     local_port = validator.port,
     remote_port = validator.port
@@ -96,6 +97,7 @@ local function init_conf(cfg)
     frpcconf.common.server_addr = cfg.server_addr
     frpcconf.common.server_port = cfg.server_port
     frpcconf.common.token = cfg.token
+    frpcconf.common.protocol = cfg.protocol
     ini.save(frpcini, frpcconf)
 
     local err

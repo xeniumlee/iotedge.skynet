@@ -50,4 +50,16 @@ function validator.number(v)
     return type(v)=="number"
 end
 
+function validator.vals(...)
+    local vals = {...}
+    return function(v)
+        for _, val in pairs(vals) do
+            if v == val then
+                return true
+            end
+        end
+        return false
+    end
+end
+
 return validator

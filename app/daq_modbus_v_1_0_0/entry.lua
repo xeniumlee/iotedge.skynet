@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local log = require "log"
-local text = require("text").modbus
+local modbustxt = require("text").modbus
+local daqtxt = require("text").daq
 local api = require "api"
 local validator = require "utils.validator"
 local client = require "modbus.client"
@@ -70,98 +71,98 @@ function list(dev)
             end
             return d.help
         else
-            return false, text.invalid_dev
+            return false, daqtxt.invalid_dev
         end
     else
-        return false, text.not_online
+        return false, daqtxt.not_online
     end
 end
 
 function read(dev, tag)
     if cli then
         return pcall(function()
-            assert(devlist[dev], text.invalid_dev)
-            assert(devlist[dev].tags[tag], text.invalid_tag)
+            assert(devlist[dev], daqtxt.invalid_dev)
+            assert(devlist[dev].tags[tag], daqtxt.invalid_tag)
             local u = devlist[dev].unitid
             local t = devlist[dev].tags[tag]
 
             -- all tag can be read, no check here
             local ok, ret = cli:request(u, t.read)
-            assert(ok, strfmt("%s:%s", text.req_fail, ret))
+            assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
 
             local uid = ret[1]
-            assert(uid==u, strfmt("%s:%s:%s", text.invalid_unit, u, uid))
+            assert(uid==u, strfmt("%s:%s:%s", modbustxt.invalid_unit, u, uid))
 
             local fc = ret[2]
-            assert(fc==t.fc, strfmt("%s:%s:%s", text.invalid_fc, t.fc, fc))
+            assert(fc==t.fc, strfmt("%s:%s:%s", modbustxt.invalid_fc, t.fc, fc))
 
             local data = ret[3]
-            assert(type(data)=="table", strfmt("%s:%s", text.exception, data))
+            assert(type(data)=="table", strfmt("%s:%s", modbustxt.exception, data))
 
             if t.fc == 3 or t.fc == 4 then
                 local n = #data
-                assert(n==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, n))
+                assert(n==t.number, strfmt("%s:%s:%s", modbustxt.invalid_num, t.number, n))
             end
             return t.unpack(1, data)
         end)
     else
-        return false, text.not_online
+        return false, daqtxt.not_online
     end
 end
 
 local function do_write(dev, tag, value)
-    assert(devlist[dev].tags[tag], text.invalid_arg)
+    assert(devlist[dev].tags[tag], daqtxt.invalid_arg)
     local vt = type(value)
-    assert(vt == "number" or vt == "boolean" or vt == "string", text.invalid_arg)
+    assert(vt == "number" or vt == "boolean" or vt == "string", daqtxt.invalid_arg)
 
     local u = devlist[dev].unitid
     local t = devlist[dev].tags[tag]
 
-    assert(t.write, text.read_only)
+    assert(t.write, modbustxt.read_only)
     local p = t.write(value)
 
     local ok, ret = cli:request(u, p)
-    assert(ok, strfmt("%s:%s", text.req_fail, ret))
+    assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
     local uid = ret[1]
-    assert(uid==u, strfmt("%s:%s:%s", text.invalid_unit, u, uid))
+    assert(uid==u, strfmt("%s:%s:%s", modbustxt.invalid_unit, u, uid))
     local fc = ret[2]
-    assert(fc==t.wfc, strfmt("%s:%s:%s", text.invalid_fc, t.wfc, fc))
+    assert(fc==t.wfc, strfmt("%s:%s:%s", modbustxt.invalid_fc, t.wfc, fc))
     local addr = ret[3]
     local data = ret[4]
-    assert(data ~= nil, strfmt("%s:%s", text.exception, addr))
-    assert(addr==t.addr, strfmt("%s:%s:%s", text.invalid_addr, t.addr, addr))
+    assert(data ~= nil, strfmt("%s:%s", modbustxt.exception, addr))
+    assert(addr==t.addr, strfmt("%s:%s:%s", modbustxt.invalid_addr, t.addr, addr))
     if fc == 5 or fc == 6 then
         local v = t.unpack(1, {data})
-        assert(value==v, strfmt("%s:%s:%s", text.invalid_write, value, v))
+        assert(value==v, strfmt("%s:%s:%s", modbustxt.invalid_write, value, v))
     else
-        assert(data==t.number, strfmt("%s:%s:%s", text.invalid_num, t.number, data))
+        assert(data==t.number, strfmt("%s:%s:%s", modbustxt.invalid_num, t.number, data))
     end
-    log.info(text.write_suc, dev, tag, tostring(value))
+    log.info(daqtxt.write_suc, dev, tag, tostring(value))
 end
 
 function write(dev, arg)
     if cli then
         return pcall(function()
-            assert(devlist[dev], text.invalid_dev)
-            assert(type(arg) == "table", text.invalid_arg)
+            assert(devlist[dev], daqtxt.invalid_dev)
+            assert(type(arg) == "table", daqtxt.invalid_arg)
             do_write(dev, arg[1], arg[2])
         end)
     else
-        return false, text.not_online
+        return false, daqtxt.not_online
     end
 end
 
 function write_multi(dev, arg)
     if cli then
         return pcall(function()
-            assert(devlist[dev], text.invalid_dev)
+            assert(devlist[dev], daqtxt.invalid_dev)
             assert(type(arg) == "table" and
-                type(arg.taglist) == "table", text.invalid_arg)
+                type(arg.taglist) == "table", daqtxt.invalid_arg)
 
             local taglist = arg.taglist
             local ok, err
             for i, tag in pairs(taglist) do
-                assert(type(tag) == "table", text.invalid_arg)
+                assert(type(tag) == "table", daqtxt.invalid_arg)
                 ok, err = pcall(do_write, dev, tag.tag, tag.value)
                 if ok then
                     taglist[i] = ok
@@ -172,7 +173,7 @@ function write_multi(dev, arg)
             return arg
         end)
     else
-        return false, text.not_online
+        return false, daqtxt.not_online
     end
 end
 
@@ -229,16 +230,16 @@ local function make_poll(dname, unitid, fc, start, number, interval, index)
         while running do
             local ok, err = pcall(function()
                 local ok, ret = cli:request(unitid, p)
-                assert(ok, strfmt("%s %s:%s", log_prefix, text.req_fail, ret))
+                assert(ok, strfmt("%s %s:%s", log_prefix, daqtxt.req_fail, ret))
                 local uid = ret[1]
-                assert(uid==unitid, strfmt("%s %s:%s:%s", log_prefix, text.invalid_unit, unitid, uid))
+                assert(uid==unitid, strfmt("%s %s:%s:%s", log_prefix, modbustxt.invalid_unit, unitid, uid))
                 local c = ret[2]
-                assert(c==fc, strfmt("%s %s:%s:%s", log_prefix, text.invalid_fc, fc, c))
+                assert(c==fc, strfmt("%s %s:%s:%s", log_prefix, modbustxt.invalid_fc, fc, c))
                 local data = ret[3]
-                assert(type(data)=="table", strfmt("%s %s:%s", log_prefix, text.exception, data))
+                assert(type(data)=="table", strfmt("%s %s:%s", log_prefix, modbustxt.exception, data))
                 if fc == 3 or fc == 4 then
                     local n = #data
-                    assert(n==number, strfmt("%s %s:%s:%s", log_prefix, text.invalid_num, number, n))
+                    assert(n==number, strfmt("%s %s:%s:%s", log_prefix, modbustxt.invalid_num, number, n))
                 end
                 for i, t in pairs(index) do
                     if t.unpack then
@@ -254,7 +255,7 @@ local function make_poll(dname, unitid, fc, start, number, interval, index)
                 post(dname, index, interval)
             end)
             if not ok then
-                log.error(text.poll_fail, err)
+                log.error(daqtxt.poll_fail, err)
             end
             skynet.sleep(timeout)
         end
@@ -355,14 +356,14 @@ local function validate_poll_addr(t, addrlist)
         local a = t.addr
         if list[a] then
             assert(not list[a].name and not list[a][t.bit],
-                text.invalid_addr_conf)
+                daqtxt.invalid_addr_conf)
             list[a][t.bit] = t
         else
             list[a] = { [t.bit] = t }
         end
     else
         for a = t.addr, t.addr+t.number-1 do
-            assert(not list[a], text.invalid_addr_conf)
+            assert(not list[a], daqtxt.invalid_addr_conf)
             if a == t.addr then
                 list[a] = t
             else
@@ -385,7 +386,7 @@ local function validate_write_addr(t, addrlist)
     local list = addrlist[t.fc]
     -- DO NOT support multiple boolean tags share the same address
     for a = t.addr, t.addr+t.number-1 do
-        assert(not list[a], text.invalid_addr_conf)
+        assert(not list[a], daqtxt.invalid_addr_conf)
         if a == t.addr then
             list[a] = t
         else
@@ -399,7 +400,7 @@ local function same_dt(t1, t2)
         t1.dt == t2.dt and
         t1.le == t2.le and
         t1.bit == t2.bit,
-        text.invalid_addr_conf)
+        daqtxt.invalid_addr_conf)
 end
 
 local function validate_addr(polllist, writelist)
@@ -407,10 +408,13 @@ local function validate_addr(polllist, writelist)
         if polllist[fc] then
             local poll = polllist[fc].list
             for a, t in pairs(list) do
-                if type(poll[a]) == "table" then
-                    assert(poll[a].name and
-                           t.name,
-                           text.invalid_addr_conf)
+                local poll_t = type(poll[a])
+                assert(poll_t == "nil" or poll_t == type(t),
+                    daqtxt.invalid_addr_conf)
+
+                if poll_t == "table" then
+                    assert(poll[a].name and t.name,
+                           daqtxt.invalid_addr_conf)
                     same_dt(poll[a], t)
                 end
             end
@@ -426,15 +430,9 @@ local fc_map = {
 }
 
 local tag_schema = {
-    fc = function(v)
-        return v==1 or v==2 or v==3 or v==4 or v==5 or v==15 or v==6 or v==16
-    end,
-    dt = function(v)
-        return v=="int" or v=="uint" or v=="string" or v=="float" or v=="boolean"
-    end,
-    mode = function(v)
-        return v=="ts" or v=="attr" or v=="ctrl"
-    end,
+    fc = validator.vals(1, 2, 3, 4, 5, 15, 6, 16),
+    dt = validator.vals("int", "uint", "string", "float", "boolean"),
+    mode = validator.vals("ts", "attr", "ctrl"),
     addr = validator.minmaxint(MODBUS_ADDR_MIN, MODBUS_ADDR_MAX),
     number = validator.posint,
     bit = function(v)
@@ -477,19 +475,19 @@ local function validate_tags(dev, tle)
     local max_poll = 0
 
     for name, t in pairs(dev.tags) do
-        assert(type(name)=="string", text.invalid_tag_conf)
+        assert(type(name)=="string", daqtxt.invalid_tag_conf)
         local ok = pcall(validator.check, t, tag_schema)
-        assert(ok, text.invalid_tag_conf)
+        assert(ok, daqtxt.invalid_tag_conf)
 
         if t.gain then
-            assert(t.dt ~= "string" and t.dt ~= "boolean", text.invalid_tag_conf)
+            assert(t.dt ~= "string" and t.dt ~= "boolean", daqtxt.invalid_tag_conf)
         end
 
         fill_tag(t, name, dev)
 
         if t.mode == "ctrl" then
             t.wfc = t.fc
-            t.fc = assert(fc_map[t.fc], text.invalid_fc_conf)
+            t.fc = assert(fc_map[t.fc], modbustxt.invalid_fc_conf)
             validate_write_addr(t, writelist)
 
             local pack = mdata.pack(t.wfc, t.dt, t.number, tle, t.le, t.bit)
@@ -528,9 +526,9 @@ local function validate_devices(d, tle)
     local polls = {}
     local max = 0
     for name, dev in pairs(d) do
-        assert(type(name)=="string", text.invalid_device_conf)
+        assert(type(name)=="string", daqtxt.invalid_device_conf)
         local ok = pcall(validator.check, dev, d_schema)
-        assert(ok, text.invalid_device_conf)
+        assert(ok, daqtxt.invalid_device_conf)
 
         local addrlist, max_poll = validate_tags(dev, tle)
         if max_poll > max then
@@ -565,7 +563,7 @@ local function stop()
         cli.channel:close()
     end
     if running then
-        log.info(text.poll_stop)
+        log.info(daqtxt.poll_stop)
         running = false
         unregdev()
         skynet.sleep(max_wait)
@@ -589,7 +587,7 @@ local function config_devices(d, tle)
         max_wait = max // 10
         skynet.fork(start, d, polls)
         log.info(strfmt("%s: total(%d), max interval(%ds)",
-                text.poll_start, #polls, max // 1000))
+                daqtxt.poll_start, #polls, max // 1000))
         return ok
     else
         return ok, polls
@@ -597,9 +595,7 @@ local function config_devices(d, tle)
 end
 
 local t_schema = {
-    mode = function(v)
-        return v=="rtu" or v=="rtu_tcp" or v=="tcp"
-    end,
+    mode = validator.vals("rtu", "rtu_tcp", "tcp"),
     le = validator.boolean,
     timeout = validator.minint(poll_min),
     ascii = validator.boolean,
@@ -615,12 +611,8 @@ local t_schema = {
         rtscts = validator.boolean,
         r_timeout = validator.posint,
         b_timeout = validator.posint,
-        mode = function(v)
-            return v=="rs232" or v=="rs485"
-        end,
-        parity = function(v)
-            return v=="none" or v=="odd" or v=="even"
-        end
+        mode = validator.vals("rs232", "rs485"),
+        parity = validator.vals("none", "odd", "even")
     }
 }
 
@@ -666,7 +658,7 @@ function on_conf(conf)
             return ok, err
         end
     else
-        return false, text.invalid_transport_conf
+        return false, daqtxt.invalid_transport_conf
     end
 end
 

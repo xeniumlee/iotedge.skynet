@@ -68,23 +68,13 @@ function channel:info()
 end
 
 function channel:read(dataitem)
-    -- validate dataitem
     if not block_connect(self, true) then
         return false, socket_error
     end
     return self.__client:read(dataitem)
 end
 
-function channel:readmulti(datalist)
-    -- validate dataitem
-    if not block_connect(self, true) then
-        return false, socket_error
-    end
-    return self.__client:readmulti(datalist)
-end
-
 function channel:write(dataitem)
-    -- validate dataitem
     if not block_connect(self, true) then
         return false, socket_error
     end
@@ -118,10 +108,8 @@ function client.new(desc)
     assert(desc.host)
     local rack = desc.rack or 0
     local slot = desc.slot or 0
-    local pdusize = desc.pdusize or 480
     local cli = assert(snap7.client.new())
     cli:connectto(desc.host, rack, slot)
-    cli:setpdusize(pdusize)
 
     return setmetatable({
         __client = cli,

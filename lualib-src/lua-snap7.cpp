@@ -46,37 +46,6 @@ namespace snap7 {
             bool ok = (ret == 0);
             return std::make_tuple(ok, CliErrorText(ret));
         }
-        auto ReadMulti(sol::table DataList) {
-            TS7DataItem items[MaxVars];
-            size_t count = DataList.size();
-            for(size_t i = 1, j = 0; j != count; i++, j++) {
-                items[j].Area = DataList[i]["area"];
-                items[j].DBNumber = DataList[i]["dbnumber"];
-                items[j].Start = DataList[i]["start"];
-                items[j].Amount = DataList[i]["amount"];
-                items[j].WordLen = DataList[i]["wordlen"];
-                size_t len = buffer_size(items[j].WordLen, items[j].Amount);
-                DataList[i]["len"] = len;
-                items[j].pdata = skynet_malloc(len);
-            }
-
-            int ret = TS7Client::ReadMultiVars(&items[0], count);
-            if (ret == 0) {
-                void *data;
-                for(size_t i = 1, j = 0; j != count; i++, j++) {
-                    data = items[j].pdata;
-                    std::string s(static_cast<const char*>(data), static_cast<size_t>(DataList[i]["len"]));
-                    DataList[i]["value"] = s;
-                    skynet_free(data);
-                }
-            } else {
-                for(size_t j = 0; j != count; j++) {
-                    skynet_free(items[j].pdata);
-                }
-            }
-            bool ok = (ret == 0);
-            return std::make_tuple(ok, CliErrorText(ret));
-        }
         auto Write(const sol::table DataItem) {
             int area = DataItem["area"];
             int dbnumber = DataItem["dbnumber"];
@@ -100,23 +69,6 @@ namespace snap7 {
             info["plcstatus"] = plc_status(TS7Client::PlcStatus());
             return info;
         }
-        auto SetPDUSize(int Size) {
-            int ret = TS7Client::SetParam(p_i32_PDURequest, &Size);
-            bool ok = (ret == 0);
-            return std::make_tuple(ok, CliErrorText(ret));
-        }
-        /*
-        auto ClearPassword() {
-            int ret = TS7Client::ClearSessionPassword();
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
-        }
-        auto SetPassword(const std::string& Password) {
-            int ret = TS7Client::SetSessionPassword(const_cast<char*>(Password.data()));
-            bool b = (ret == 0);
-            return std::make_tuple(b, CliErrorText(ret));
-        }
-        */
     private:
         size_t buffer_size(int wordlen, int amount) {
             switch (wordlen)
@@ -158,11 +110,8 @@ namespace snap7 {
             "disconnect", &Cli::Disconnect,
             "connected", &Cli::Connected,
             "read", &Cli::Read,
-            "readmulti", &Cli::ReadMulti,
             "write", &Cli::Write,
-            "info", &Cli::Info,
-            "setpdusize", &Cli::SetPDUSize
-            //"setpassword", sol::overload(&Cli::SetPassword, &Cli::ClearPassword)
+            "info", &Cli::Info
         );
         return module;
     }

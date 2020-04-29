@@ -9,7 +9,7 @@ WorkingDirectory=WORKING_DIR
 ExecStart=WORKING_DIR/bin/prebuilt/node_exporter \
           --web.listen-address="127.0.0.1:9100"
           --collector.systemd \
-          --collector.systemd.unit-whitelist="(systemd-timesyncd|iotedge|frpc).service" \
+          --collector.systemd.unit-whitelist="(systemd-timesyncd|frpc|vpn).service" \
           --no-collector.arp \
           --no-collector.bcache \
           --no-collector.bonding \

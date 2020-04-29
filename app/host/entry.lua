@@ -49,10 +49,15 @@ local function post_attributes()
     local key = api.infokey
     while true do
         local info = api.sys_request("info")
-        for _, app in pairs(info.apps) do
-            app.conf = nil
+        if info then
+            for _, app in pairs(info.apps) do
+                app.conf = nil
+            end
+            info.frp = api.external_request(api.frpappid, "list_proxy")
+            --info.vpn = api.external_request(api.vpnappid, "vpn_info")
+
+            post({ [key] = info })
         end
-        post({ [key] = info })
         skynet.sleep(30000)
     end
 end

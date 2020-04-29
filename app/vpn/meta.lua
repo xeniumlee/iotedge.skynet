@@ -1,7 +1,7 @@
 conf = {
     auto = true,
-    eth = '',
-    proto = 'tcp4',
+    eth = 'eth0',
+    proto = 'udp4',
     ca = '',
     cert = '',
     key = '',

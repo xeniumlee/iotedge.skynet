@@ -20,6 +20,10 @@ conf = {
             t = 'gauge',
             p = 'node_systemd_unit_state{name="frpc%.service",state="active"%g+%s+([^\n]+)\n'
         },
+        vpn = {
+            t = 'gauge',
+            p = 'node_systemd_unit_state{name="vpn%.service",state="active"%g+%s+([^\n]+)\n'
+        },
         ntp = {
             t = 'gauge',
             p = 'node_systemd_unit_state{name="systemd%-timesyncd%.service",state="active"%g+%s+([^\n]+)\n'
