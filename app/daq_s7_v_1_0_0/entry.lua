@@ -183,25 +183,55 @@ local function post(dname, index, interval)
 end
 
 local area_map = {
-    PE = 0x81,
-    PA = 0x82,
-    MK = 0x83,
-    DB = 0x84,
-    CT = 0x1C,
-    TM = 0x1D
+    PE = {
+        id = 0x81,
+        ratio = 1,
+        wl = 0x02
+    },
+    PA = {
+        id = 0x82,
+        ratio = 1,
+        wl = 0x02
+    },
+    MK = {
+        id = 0x83,
+        ratio = 1,
+        wl = 0x02
+    },
+    DB = {
+        id = 0x84,
+        ratio = 1,
+        wl = 0x02
+    },
+    CT = {
+        id = 0x1C,
+        ratio = 0.5,
+        wl = 0x1C
+    },
+    TM = {
+        id = 0x1D,
+        ratio = 0.5,
+        wl = 0x1D
+    }
 }
 
-local function make_poll(dname, area, dbnumber, start, number, interval, index)
-    local wordlen = 0x02
-    local log_prefix = string.format("dev(%s) area(%s) db(%d) start(%d) number(%d) wordlen(%x)",
-        dname, area, dbnumber, start, number, wordlen)
+local function make_poll(dname, area, dbnumber, start, number, amount, wordlen, interval, index)
+    local log_prefix
+    if dbnumber == 0 then
+        log_prefix = string.format("dev(%s) area(0x%X) start(%d) number(%d) amount(%d) wordlen(0x%X)",
+            dname, area, start, number, amount, wordlen)
+    else
+        log_prefix = string.format("dev(%s) area(0x%X) db(%d) start(%d) number(%d) wordlen(0x%X)",
+            dname, area, dbnumber, start, number, wordlen)
+    end
+
     local timeout = interval // 10
 
     local item = {
-        area = area_map[area],
+        area = area,
         dbnumber = dbnumber,
         start = start,
-        number = number,
+        number = amount,
         len = number,
         wordlen = wordlen
     }
@@ -240,18 +270,21 @@ local function make_polls(dname, addrlist, polls)
         local index, interval
 
         local start = false
-        local area, dbnumber, number
+        local dbnumber, number
 
-        if type(key) == "string" then
-            area = key
-            dbnumber = 0
-        else
-            area = "DB"
+        if type(key) == "number" then
             dbnumber = key
+            key = "DB"
+        else
+            dbnumber = 0
         end
 
+        local area = area_map[key]
+
         local function make()
-            local poll = make_poll(dname, area, dbnumber, start, number, interval, index)
+            local amount = math.floor(number*area.ratio)
+            local poll = make_poll(dname, area.id, dbnumber, start,
+                number, amount, area.wl, interval, index)
             tblins(polls, poll)
         end
 
@@ -302,7 +335,7 @@ end
 
 local function validate_poll_addr(t, addrlist)
     local addr
-    if t.dbnumber then
+    if t.area == "DB" then
         if not addrlist[t.dbnumber] then
             addrlist[t.dbnumber] = {
                 list = {},
@@ -449,14 +482,20 @@ local function validate_model(tag, model)
         end
     end
     assert(ok, s7txt.invalid_area_conf)
+
+    if tag.area == "TM" or tag.area == "CT" then
+        assert(tag.dt == "word", s7txt.invalid_dt_conf)
+    end
+
     local n = tag.dbnumber
-    if n then
+    if tag.area == "DB" then
         assert(math.tointeger(n) and n>0 and n<=model.maxdbnumber,
             s7txt.invalid_dbnumber_conf)
     end
+
     local a = tag.addr
     assert(math.tointeger(a) and a>=0, daqtxt.invalid_addr_conf)
-    if n then
+    if tag.area == "DB" then
         assert(a<=model.maxaddr, daqtxt.invalid_addr_conf)
     else
         assert(a<=max_addr, daqtxt.invalid_addr_conf)

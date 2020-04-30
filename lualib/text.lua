@@ -41,6 +41,7 @@ local text = {
     s7 = {
         invalid_area_conf = "invalid area configuration",
         invalid_dbnumber_conf = "invalid dbnumber configuration",
+        invalid_dt_conf = "invalid datatype for TM or CT area"
     },
     daq = {
         not_online = "device not online",
