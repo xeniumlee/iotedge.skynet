@@ -110,7 +110,7 @@ local function calc_len(dt, opt)
     end
 end
 
-local function calc_amount(area, len)
+local function calc_number(area, len)
     if area == "TM" or area == "CT" then
         return math.ceil(len/2)
     else
@@ -130,7 +130,7 @@ return function(area, dbnumber, addr, dt, opt)
         dbnumber = dbnumber or 0,
         start = calc_start(addr, dt, opt),
         len = l,
-        amount = calc_amount(area, l),
+        number = calc_number(area, l),
         wordlen = d.wl or a.wl
     }
 
@@ -143,7 +143,7 @@ return function(area, dbnumber, addr, dt, opt)
                 area = r.area,
                 dbnumber = r.dbnumber,
                 start = r.start,
-                amount = r.amount,
+                number = r.number,
                 wordlen = r.wordlen,
                 data = strpack(d.fmt, v)
             }
@@ -155,7 +155,7 @@ return function(area, dbnumber, addr, dt, opt)
                 area = r.area,
                 dbnumber = r.dbnumber,
                 start = r.start,
-                amount = r.amount,
+                number = r.number,
                 wordlen = r.wordlen,
                 data = strpack(d.fmt, val)
             }
@@ -167,7 +167,7 @@ return function(area, dbnumber, addr, dt, opt)
                 area = r.area,
                 dbnumber = r.dbnumber,
                 start = r.start,
-                amount = r.amount,
+                number = r.number,
                 wordlen = r.wordlen,
                 data = strpack(d.fmt, val)
             }
@@ -182,7 +182,7 @@ return function(area, dbnumber, addr, dt, opt)
         end
         u_bool = function(index, val)
             local v = strunpack(d.fmt, strsub(val, index, index+l-1))
-            return ((1<<d.opt) & v) ~= 0
+            return ((1<<opt) & v) ~= 0
         end
     else
         u = function(index, val)

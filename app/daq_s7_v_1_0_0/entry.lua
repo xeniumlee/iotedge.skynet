@@ -92,6 +92,7 @@ local function do_write(dev, tag, value)
     assert(vt == "number" or vt == "boolean" or vt == "string", daqtxt.invalid_arg)
 
     local t = devlist[dev].tags[tag]
+    assert(t.mode == "ctrl", daqtxt.read_only)
 
     local ok, ret = cli:write(t.write(value))
     assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
@@ -181,10 +182,29 @@ local function post(dname, index, interval)
     end
 end
 
-local function make_poll(dname, item, interval, index)
-    local log_prefix = string.format("dev(%s) area(%x) db(%d) start(%d) number(%d) wordlen(%x)",
-        dname, item.area, item.dbnumber, item.start, item.amount, item.wordlen)
+local area_map = {
+    PE = 0x81,
+    PA = 0x82,
+    MK = 0x83,
+    DB = 0x84,
+    CT = 0x1C,
+    TM = 0x1D
+}
+
+local function make_poll(dname, area, dbnumber, start, number, interval, index)
+    local wordlen = 0x02
+    local log_prefix = string.format("dev(%s) area(%s) db(%d) start(%d) number(%d) wordlen(%x)",
+        dname, area, dbnumber, start, number, wordlen)
     local timeout = interval // 10
+
+    local item = {
+        area = area_map[area],
+        dbnumber = dbnumber,
+        start = start,
+        number = number,
+        len = number,
+        wordlen = wordlen
+    }
 
     local function poll()
         while running do
@@ -217,45 +237,45 @@ end
 local function make_polls(dname, addrlist, polls)
     for key, addrinfo in pairs(addrlist) do
         local list = addrinfo.list
-        local index
-        local interval
+        local index, interval
 
-        local item = {
-            start = false,
-            wordlen = 0x02
-        }
+        local start = false
+        local area, dbnumber, number
+
         if type(key) == "string" then
-            item.area = key
-            item.dbnumber = 0
+            area = key
+            dbnumber = 0
         else
-            item.area = "DB"
-            item.dbnumber = key
+            area = "DB"
+            dbnumber = key
         end
 
         local function make()
-            local poll = make_poll(dname, item, interval, index)
+            local poll = make_poll(dname, area, dbnumber, start, number, interval, index)
             tblins(polls, poll)
+        end
+
+        local function tag_poll(t)
+            if t.poll then
+                return t.poll
+            else
+                -- with bit
+                local _, tag = next(t)
+                return tag.poll
+            end
         end
 
         local function add(t, addr)
             if addr then
-                item.start = addr
-                item.amount = 0
+                start = addr
+                number = 0
                 index = {}
                 interval = 0xFFFFFFFF
             end
-            local number = item.amount
             index[number+1] = t
-            item.amount = number + t.read and t.read.len or 1
+            number = number + (t.read and t.read.len or 1)
 
-            local i
-            if t.poll then
-                i = t.poll
-            else
-                -- with bit
-                local _, tag = next(t)
-                i = tag.poll
-            end
+            local i = tag_poll(t)
             if i < interval then
                 interval = i
             end
@@ -264,15 +284,15 @@ local function make_polls(dname, addrlist, polls)
         for a = addrinfo.min, addrinfo.max do
             local t = list[a]
             if type(t) == "table" then
-                if item.start then
+                if start then
                     add(t)
                 else
                     add(t, a)
                 end
             elseif t == nil then
-                if item.start then
+                if start then
                     make()
-                    item.start = false
+                    start = false
                 end
             end
         end
@@ -518,7 +538,7 @@ local function validate_devices(d, model)
         if max_poll > max then
             max = max_poll
         end
-        make_polls(name, dev.unitid, addrlist, polls)
+        make_polls(name, addrlist, polls)
     end
     return polls, max
 end
@@ -597,11 +617,15 @@ end
 
 function on_conf(conf)
     if config_transport(conf.transport) then
-        local ok, err = config_devices(conf.devices, conf.transport.model)
-        if ok then
-            return ok
+        if type(conf.devices) == "table"  then
+            local ok, err = config_devices(conf.devices, conf.transport.model)
+            if ok then
+                return ok
+            else
+                return ok, err
+            end
         else
-            return ok, err
+            return false, daqtxt.invalid_device_conf
         end
     else
         return false, daqtxt.invalid_transport_conf

@@ -31,7 +31,6 @@ local text = {
     },
     modbus = {
         invalid_fc_conf = "invalid function code configuration",
-        read_only = "read-only tag",
         invalid_unit = "invalid device of response",
         invalid_num = "invalid number of response",
         invalid_fc = "invalid function code of response",
@@ -49,6 +48,7 @@ local text = {
         poll_stop = "poll stopped",
         poll_fail = "poll failed",
         req_fail = "fetch data failed",
+        read_only = "read-only tag",
         write_suc = "write done",
         invalid_transport_conf = "invalid transport configuration",
         invalid_device_conf = "invalid device configuration",

@@ -118,7 +118,7 @@ local function do_write(dev, tag, value)
     local u = devlist[dev].unitid
     local t = devlist[dev].tags[tag]
 
-    assert(t.write, modbustxt.read_only)
+    assert(t.mode == "ctrl", daqtxt.read_only)
     local p = t.write(value)
 
     local ok, ret = cli:request(u, p)
@@ -224,8 +224,10 @@ end
 
 local function make_poll(dname, unitid, fc, start, number, interval, index)
     local p = cli_pack(fc, start, number)
-    local log_prefix = string.format("%s(%d): %d, %d(%d)", dname, unitid, fc, start, number)
+    local log_prefix = string.format("dev(%s) slave(%d) fc(%d), start(%d) number(%d)",
+        dname, unitid, fc, start, number)
     local timeout = interval // 10
+
     local function poll()
         while running do
             local ok, err = pcall(function()
@@ -272,64 +274,56 @@ local maxnumber = {
 
 local function make_polls(dname, unitid, addrlist, polls)
     for fc, addrinfo in pairs(addrlist) do
-        local max = maxnumber[fc]
         local list = addrinfo.list
+        local index, interval
+
         local start = false
-        local index
         local number
-        local interval
+        local max = maxnumber[fc]
+
         local function make()
             local poll = make_poll(dname, unitid, fc, start, number, interval, index)
             tblins(polls, poll)
         end
-        local function add(t, addr)
-            if addr then
-                start = addr
-                index = {}
-                number = 0
-                interval = 0xFFFFFFFF
-            end
-            index[number+1] = t
 
-            local n
-            if t.number then
-                n = t.number
-            else
-                -- with bit
-                n = 1
-            end
-            number = number + n
-
-            local i
+        local function tag_poll(t)
             if t.poll then
-                i = t.poll
+                return t.poll
             else
                 -- with bit
                 local _, tag = next(t)
-                i = tag.poll
+                return tag.poll
             end
+        end
+
+        local function add(t, addr)
+            if addr then
+                start = addr
+                number = 0
+                index = {}
+                interval = 0xFFFFFFFF
+            end
+            index[number+1] = t
+            number = number + (t.number or 1)
+
+            local i = tag_poll(t)
             if i < interval then
                 interval = i
             end
         end
+
         for a = addrinfo.min, addrinfo.max do
             local t = list[a]
             if type(t) == "table" then
-                if not start then
-                    add(t, a)
-                else
-                    local n
-                    if t.number then
-                        n = t.number
-                    else
-                        n = 1
-                    end
-                    if number + n <= max then
+                if start then
+                    if number + (t.number or 1) <= max then
                         add(t)
                     else
                         make()
                         add(t, a)
                     end
+                else
+                    add(t, a)
                 end
             elseif t == nil then
                 if start then
@@ -651,11 +645,15 @@ end
 
 function on_conf(conf)
     if config_transport(conf.transport) then
-        local ok, err = config_devices(conf.devices, conf.transport.le)
-        if ok then
-            return ok
+        if type(conf.devices) == "table"  then
+            local ok, err = config_devices(conf.devices, conf.transport.le)
+            if ok then
+                return ok
+            else
+                return ok, err
+            end
         else
-            return ok, err
+            return false, daqtxt.invalid_device_conf
         end
     else
         return false, daqtxt.invalid_transport_conf

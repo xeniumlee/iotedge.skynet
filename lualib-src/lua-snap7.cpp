@@ -30,7 +30,7 @@ namespace snap7 {
             int area = DataItem["area"];
             int dbnumber = DataItem["dbnumber"];
             int start = DataItem["start"];
-            int amount = DataItem["amount"];
+            int amount = DataItem["number"];
             int wordlen = DataItem["wordlen"];
             size_t len = DataItem["len"];
             void *data = skynet_malloc(len);
@@ -49,7 +49,7 @@ namespace snap7 {
             int area = DataItem["area"];
             int dbnumber = DataItem["dbnumber"];
             int start = DataItem["start"];
-            int amount = DataItem["amount"];
+            int amount = DataItem["number"];
             int wordlen = DataItem["wordlen"];
             std::string s = DataItem["data"];
             void *data = const_cast<void*>(static_cast<const void*>(s.data()));
