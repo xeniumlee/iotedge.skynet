@@ -3,11 +3,6 @@
     "auth": "",
     "uri": ""
   },
-  "frp": {
-    "server_addr": "",
-    "server_port": 7000,
-    "token": ""
-  },
   "apps": [
     {
       "pub_mqtt_v_1_0_0": {}

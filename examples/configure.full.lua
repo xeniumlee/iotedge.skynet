@@ -2,14 +2,14 @@ repo = {
     auth = "",
     uri = ""
 }
-frp = {
-    server_addr = "",
-    server_port = 7000,
-    token = ""
-}
 apps = {
-    { pub_mqtt_v_1_0_0 = {} },
-    { daq_modbus_v_1_0_0 = {
+    frp = {
+        server_addr = "",
+        server_port = 7000,
+        token = ""
+    }
+    [1] = { pub_mqtt_v_1_0_0 = {} },
+    [2] = { daq_modbus_v_1_0_0 = {
         transport = {
             ascii = false,    -- optional, default false
             le = false,       -- byte order
