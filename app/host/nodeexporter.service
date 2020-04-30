@@ -7,7 +7,7 @@ After=network.target
 WorkingDirectory=WORKING_DIR
 # cpu filesystem loadavg meminfo netclass netdev netstat thermal_zone time uname
 ExecStart=WORKING_DIR/bin/prebuilt/node_exporter \
-          --web.listen-address="127.0.0.1:9100"
+          --web.listen-address="127.0.0.1:9100" \
           --collector.systemd \
           --collector.systemd.unit-whitelist="(systemd-timesyncd|frpc|vpn).service" \
           --no-collector.arp \
