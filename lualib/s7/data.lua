@@ -100,19 +100,25 @@ local function calc_start(addr, dt, opt)
     end
 end
 
-local function calc_len(dt, opt)
+local function calc_len(area, dt, opt)
+    local len
     if dt == "string" then
         assert(math.tointeger(opt) and opt > 0,
             err.invalid_string)
-        return opt
+        len = opt
     else
-        return dt_map[dt].len
+        len = dt_map[dt].len
+    end
+    if area == "TM" or area == "CT" then
+        return math.ceil(len/2)*2
+    else
+        return len
     end
 end
 
 local function calc_number(area, len)
     if area == "TM" or area == "CT" then
-        return math.ceil(len/2)
+        return len/2
     else
         return len
     end
@@ -124,7 +130,7 @@ return function(area, dbnumber, addr, dt, opt)
     end
     local a = assert(area_map[area], err.invalid_area)
     local d = assert(dt_map[dt], err.invalid_datatype)
-    local l = calc_len(dt, opt)
+    local l = calc_len(area, dt, opt)
     local r = {
         area = a.id,
         dbnumber = dbnumber or 0,
