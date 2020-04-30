@@ -16,6 +16,7 @@ local keepalive_timeout = 6000
 
 local sys_uri = ""
 local sys_id = ""
+local sys_secret
 
 local telemetry_topic = ""
 local telemetry_qos = 1
@@ -260,6 +261,21 @@ local function unpack_conf(conf)
     end
 end
 
+local function unpack_vpn(conf)
+    local c = unpack_conf(conf)
+    local crypt = require "skynet.crypt"
+    c.key = crypt.desdecode(sys_secret, c.key)
+    return { [api.vpnappid] = c }
+end
+
+local function unpack_frp(conf)
+    return { [api.frpappid] = unpack_conf(conf) }
+end
+
+local function unpack_repo(conf)
+    return { repo = unpack_conf(conf) }
+end
+
 local conf_map = {
     configuration = function(conf)
         local c = unpack_conf(conf)
@@ -293,9 +309,9 @@ local conf_map = {
         end
         return c
     end,
-    vpn = unpack_conf,
-    frp = unpack_conf,
-    repo = unpack_conf
+    vpn = unpack_vpn,
+    frp = unpack_frp,
+    repo = unpack_repo
 }
 
 local function decode_config(msg)
@@ -636,6 +652,7 @@ local function init()
         init_topics(conf.topic)
         sys_uri = conf.uri
         sys_id = conf.id
+        sys_secret = string.sub(conf.username, 1, 8)
         cocurrency = conf.cocurrency
 
         client = mqtt.client {
