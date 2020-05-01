@@ -182,59 +182,19 @@ local function post(dname, index, interval)
     end
 end
 
-local area_map = {
-    PE = {
-        id = 0x81,
-        ratio = 1,
-        wl = 0x02
-    },
-    PA = {
-        id = 0x82,
-        ratio = 1,
-        wl = 0x02
-    },
-    MK = {
-        id = 0x83,
-        ratio = 1,
-        wl = 0x02
-    },
-    DB = {
-        id = 0x84,
-        ratio = 1,
-        wl = 0x02
-    },
-    CT = {
-        id = 0x1C,
-        ratio = 0.5,
-        wl = 0x1C
-    },
-    TM = {
-        id = 0x1D,
-        ratio = 0.5,
-        wl = 0x1D
-    }
-}
+local function make_poll(dname, area, dbnumber, start, len, interval, index)
+    local item = s7data.r_handle(area, dbnumber, start, len)
 
-local function make_poll(dname, area, dbnumber, start, number, amount, wordlen, interval, index)
     local log_prefix
-    if dbnumber == 0 then
-        log_prefix = string.format("dev(%s) area(0x%X) start(%d) number(%d) amount(%d) wordlen(0x%X)",
-            dname, area, start, number, amount, wordlen)
+    if dbnumber then
+        log_prefix = string.format("dev(%s) area(%s) db(%d) start(%d) len(%d) words(%d) wordlen(0x%X)",
+            dname, area, dbnumber, start, len, item.number, item.wordlen)
     else
-        log_prefix = string.format("dev(%s) area(0x%X) db(%d) start(%d) number(%d) wordlen(0x%X)",
-            dname, area, dbnumber, start, number, wordlen)
+        log_prefix = string.format("dev(%s) area(%s) start(%d) len(%d) words(%d) wordlen(0x%X)",
+            dname, area, start, len, item.number, item.wordlen)
     end
 
     local timeout = interval // 10
-
-    local item = {
-        area = area,
-        dbnumber = dbnumber,
-        start = start,
-        number = amount,
-        len = number,
-        wordlen = wordlen
-    }
 
     local function poll()
         while running do
@@ -270,21 +230,16 @@ local function make_polls(dname, addrlist, polls)
         local index, interval
 
         local start = false
-        local dbnumber, number
+        local dbnumber, len
 
         if type(key) == "number" then
             dbnumber = key
             key = "DB"
-        else
-            dbnumber = 0
         end
 
-        local area = area_map[key]
-
         local function make()
-            local amount = math.floor(number*area.ratio)
-            local poll = make_poll(dname, area.id, dbnumber, start,
-                number, amount, area.wl, interval, index)
+            local poll = make_poll(dname, key, dbnumber,
+                start, len, interval, index)
             tblins(polls, poll)
         end
 
@@ -301,12 +256,12 @@ local function make_polls(dname, addrlist, polls)
         local function add(t, addr)
             if addr then
                 start = addr
-                number = 0
+                len = 0
                 index = {}
                 interval = 0xFFFFFFFF
             end
-            index[number+1] = t
-            number = number + (t.read and t.read.len or 1)
+            index[len+1] = t
+            len = len + (t.read and t.read.len or 1)
 
             local i = tag_poll(t)
             if i < interval then
@@ -457,7 +412,8 @@ local function fill_tag(t, name, dev)
         t.poll_cum = 0
         t.poll = t.poll or dev.attr_poll
     end
-    t.read, t.write, t.unpack, t.unpack_bool = s7data(t.area, t.dbnumber, t.addr, t.dt, t.opt)
+    t.read, t.write, t.unpack, t.unpack_bool =
+        s7data.dt_handle(t.area, t.dbnumber, t.addr, t.dt, t.opt)
 end
 
 local model_map = {

@@ -15,27 +15,33 @@ local err = {
 local area_map = {
     PE = {
         id = 0x81,
-        wl = 0x02
+        wl = 0x02,
+        number = function(v) return v end,
     },
     PA = {
         id = 0x82,
-        wl = 0x02
+        wl = 0x02,
+        number = function(v) return v end,
     },
     MK = {
         id = 0x83,
-        wl = 0x02
+        wl = 0x02,
+        number = function(v) return v end,
     },
     DB = {
         id = 0x84,
-        wl = 0x02
+        wl = 0x02,
+        number = function(v) return v end,
     },
     CT = {
         id = 0x1C,
-        wl = 0x1C
+        wl = 0x1C,
+        number = function(v) return v//2 end,
     },
     TM = {
         id = 0x1D,
-        wl = 0x1D
+        wl = 0x1D,
+        number = function(v) return v//2 end,
     }
 }
 
@@ -110,15 +116,20 @@ local function calc_len(len, opt)
     end
 end
 
-local function calc_number(area, len)
-    if area == "TM" or area == "CT" then
-        return len//2
-    else
-        return len
-    end
+local data = {}
+function data.r_handle(area, dbnumber, addr, len)
+    local a = assert(area_map[area], err.invalid_area)
+    return {
+        area = a.id,
+        dbnumber = dbnumber or 0,
+        start = addr,
+        number = a.number(len),
+        len = len,
+        wordlen = a.wl
+    }
 end
 
-return function(area, dbnumber, addr, dt, opt)
+function data.dt_handle(area, dbnumber, addr, dt, opt)
     if area == "DB" then
         assert(dbnumber, err.invalid_dbnumber)
     end
@@ -130,7 +141,7 @@ return function(area, dbnumber, addr, dt, opt)
         dbnumber = dbnumber or 0,
         start = calc_start(addr, dt, opt),
         len = l,
-        number = calc_number(area, l),
+        number = a.number(l),
         wordlen = d.wl or a.wl
     }
 
@@ -193,3 +204,5 @@ return function(area, dbnumber, addr, dt, opt)
     end
     return r, w, u, u_bool
 end
+
+return data
