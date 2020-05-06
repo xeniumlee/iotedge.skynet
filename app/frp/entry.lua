@@ -147,8 +147,8 @@ local function dup_vpn(name)
     return false
 end
 
-local function do_open(p)
-    return update(p.name, p)
+local function do_open(name, p)
+    return update(name, p)
 end
 local function do_close(name)
     return update(name)
@@ -160,7 +160,7 @@ function open_proxy(proxy)
     end
     local ok = pcall(validator.check, proxy, p_schema)
     if ok and not dup(proxy) then
-        return do_open(proxy)
+        return do_open(proxy.name, proxy)
     else
         return false, text.invalid_arg
     end
@@ -183,7 +183,7 @@ function open_console(port)
     local p = tonumber(port)
     if p then
         proxylist.console.remote_port = p
-        return do_open(proxylist.console)
+        return do_open(proxylist.console.name, proxylist.console)
     else
         return false, text.invalid_arg
     end
@@ -202,7 +202,7 @@ function open_ssh(port)
     local p = tonumber(port)
     if p then
         proxylist.ssh.remote_port = p
-        return do_open(proxylist.ssh)
+        return do_open(proxylist.ssh.name, proxylist.ssh)
     else
         return false, text.invalid_arg
     end
@@ -221,7 +221,7 @@ function open_ws(port)
     local p = tonumber(port)
     if p then
         proxylist.ws.remote_port = p
-        return do_open(proxylist.ws)
+        return do_open(proxylist.ws.name, proxylist.ws)
     else
         return false, text.invalid_arg
     end
@@ -241,9 +241,9 @@ function open_vpn(token)
         local vpn = get_vpninfo()
         if vpn.running then
             proxylist.vpn.type = vpn_type[vpn.proto]
-            proxylist.vpn.name = token
+            proxylist.vpn.name = "vpn"
             proxylist.vpn.sk = token
-            return do_open(proxylist.vpn)
+            return do_open(token, proxylist.vpn)
         else
             return false, text.vpn_stopped
         end
