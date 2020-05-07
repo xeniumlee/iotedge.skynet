@@ -32,6 +32,7 @@ local api = {
     frpappid = "frp",
     vpnappid = "vpn",
     infokey = "edgeinfo",
+    iotedgedev = "iotedge",
     gateway_addr = gateway_addr,
     store_addr = store_addr,
     batch_max = 200,
@@ -143,11 +144,11 @@ function api.unreg_dev(name)
 end
 
 function api.post_gtelemetry(data)
-    direct_post("gtelemetry", "iotedge", pack_data(data))
+    direct_post("gtelemetry", api.iotedgedev, pack_data(data))
 end
 
 function api.post_gattr(attr)
-    direct_post("gattributes", "iotedge", attr)
+    direct_post("gattributes", api.iotedgedev, attr)
 end
 
 function api.post_attr(dev, attr)

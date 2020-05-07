@@ -159,334 +159,7 @@ local function handle_connect(connack, cli)
     skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
 end
 
---[[
-payload = {
-    "device":"",
-    "data":{
-        "id": $request_id,
-        "method":"",
-        "params":{}
-    }
-  }
---]]
-local function decode_rpc(msg)
-    local request = seri.unpack(msg.payload)
-    if type(request) ~= "table" then
-        log.error(log_prefix, text.unpack_fail)
-        return false
-    end
-    if type(request.device) ~= "string" then
-        log.error(log_prefix, text.unknown_dev)
-        return false
-    end
-    if type(request.data) == "table" then
-        local data = request.data
-        if data.id and data.method and data.params then
-            return  request.device, data.method, data.params, data.id
-        else
-            log.error(log_prefix, text.invalid_req)
-            return false
-        end
-    else
-        log.error(log_prefix, text.invalid_req)
-        return false
-    end
-end
-
---[[
-payload = {
-    "device":"",
-    "id": $request_id,
-    "data":{}
-  }
---]]
-local function respond_rpc(cli, dev, ret, session)
-    local response = {
-        device = dev,
-        id = session,
-        data = ret
-    }
-    local payload = seri.pack(response)
-    if not payload then
-        log.error(log_prefix, text.pack_fail)
-        return
-    end
-    local msg = {}
-    msg.topic = rpc_topic
-    msg.qos = rpc_qos
-    msg.payload = payload
-    ensure_publish(cli, msg)
-end
-
-local forked = 0
-local function busy_rpc()
-    if forked < cocurrency then
-        forked = forked + 1
-        return false
-    else
-        return true
-    end
-end
-local function done_rpc()
-    forked = forked - 1
-end
-
-local function handle_rpc(msg, cli)
-    if busy_rpc() then
-        log.error(log_prefix, text.busy)
-    else
-        skynet.fork(function()
-            local dev, cmd, arg, session = decode_rpc(msg)
-            log.info(log_prefix, "decoded rpc", dev, cmd, dump(arg))
-            if dev then
-                local ok, ret = api.external_request(dev, cmd, arg)
-                if ret then
-                    respond_rpc(cli, dev, { ok, ret }, session)
-                else
-                    respond_rpc(cli, dev, ok, session)
-                end
-            end
-            done_rpc()
-        end)
-    end
-end
-
-local function unpack_conf(conf)
-    local c = seri.unpack(conf)
-    if type(c) == "table" then
-        return c
-    else
-        log.error(log_prefix, text.unpack_fail)
-        error(text.unpack_fail)
-    end
-end
-
-local function unpack_vpn(conf)
-    local c = unpack_conf(conf)
-    local crypt = require "skynet.crypt"
-    c.key = crypt.desdecode(sys_secret, c.key)
-    return { [api.vpnappid] = c }
-end
-
-local function unpack_frp(conf)
-    return { [api.frpappid] = unpack_conf(conf) }
-end
-
-local function unpack_repo(conf)
-    return { repo = unpack_conf(conf) }
-end
-
-local conf_map = {
-    configuration = function(conf)
-        local c = unpack_conf(conf)
-        if type(c.apps) == "table" then
-            local apps = c.apps
-            local app_name, device_name, tag_name
-            for i, app in pairs(apps) do
-                app_name = string.format("%s_%s", app.app_name, app.app_version)
-                app.app_name = nil
-                app.app_version = nil
-                if type(app.devices) == "table" then
-                    local devices = {}
-                    for _, device in pairs(app.devices) do
-                        device_name = device.device_name
-                        device.device_name = nil
-                        if type(device.tags) == "table" then
-                            local tags = {}
-                            for _, tag in pairs(device.tags) do
-                                tag_name = tag.tag_name
-                                tag.tag_name = nil
-                                tags[tag_name] = tag
-                            end
-                            device.tags = tags
-                        end
-                        devices[device_name] = device
-                    end
-                    app.devices = devices
-                end
-                apps[i] = { [app_name] = app }
-            end
-        end
-        return c
-    end,
-    vpn = unpack_vpn,
-    frp = unpack_frp,
-    repo = unpack_repo
-}
-
-local function decode_config(msg)
-    local conf = seri.unpack(msg.payload)
-    if type(conf) ~= "table" then
-        log.error(log_prefix, text.unpack_fail)
-        error(text.unpack_fail)
-    end
-    log.info(log_prefix, "origin config", dump(conf))
-
-    local k, v = next(conf)
-    local f = conf_map[k]
-    if f then
-        conf = f(v)
-        log.info(log_prefix, "decoded config", dump(conf))
-        return conf
-    else
-        log.error(log_prefix, text.invalid_conf, tostring(k))
-        error(text.invalid_conf)
-    end
-end
-
-local function handle_config(msg, cli)
-    skynet.fork(function()
-        local ok, conf = pcall(decode_config, msg)
-        if ok and conf then
-            local err
-            ok, err = api.sys_request("configure", conf)
-            if ok then
-                log.info(log_prefix, text.configure_suc)
-            else
-                log.error(log_prefix, text.configure_fail, err)
-            end
-        end
-    end)
-end
-
-local req_map = {
-    open_console = api.frpappid,
-    open_vpn = api.frpappid,
-    close_vpn = api.frpappid,
-    vpn_info = api.vpnappid,
-    upgrade = api.sysappid
-}
-
---[[
-msg = {
-    topic=request_id
-    }
-payload = {
-    "method":"",
-    "params":{}
-    }
---]]
-local function decode_req(msg)
-    local request = seri.unpack(msg.payload)
-    if type(request) ~= "table" then
-        log.error(log_prefix, text.unpack_fail)
-        return false
-    end
-    local dev = req_map[request.method]
-    if not dev then
-        log.error(log_prefix, text.invalid_req)
-        return false
-    end
-    if type(request.params) ~= "table" then
-        log.error(log_prefix, text.invalid_req)
-        return false
-    end
-    local session = msg.topic:match("^.+/([^/]+)$")
-    if math.tointeger(session) then
-        return dev, request.method, request.params, session
-    else
-        log.error(log_prefix, text.invalid_req)
-        return false
-    end
-end
-
-local function respond_req(cli, ret, session)
-    local payload = seri.pack(ret)
-    if not payload then
-        log.error(log_prefix, text.pack_fail)
-        return
-    end
-    local msg = {}
-    msg.topic = gresp_topic.."/"..session
-    msg.qos = gresp_qos
-    msg.payload = payload
-    ensure_publish(cli, msg)
-end
-
-local function handle_req(msg, cli)
-    if busy_rpc() then
-        log.error(log_prefix, text.busy)
-    else
-        skynet.fork(function()
-            local dev, cmd, arg, session = decode_req(msg)
-            log.info(log_prefix, "decoded req", dev, cmd, dump(arg))
-            if dev then
-                local ok, ret = api.external_request(dev, cmd, arg)
-                if ret then
-                    respond_req(cli, { ok, ret }, session)
-                else
-                    respond_req(cli, ok, session)
-                end
-                done_rpc()
-            end
-        end)
-    end
-end
-
-local handler_map = {}
-
-local function init_seri(topic)
-    if topic:match("^.+/zip$") then
-        return seri.zpack
-    else
-        return seri.pack
-    end
-end
-
-local function init_topics(topic)
-    telemetry_topic = topic.telemetry.txt
-    telemetry_qos = topic.telemetry.qos
-    telemetry_pack = init_seri(telemetry_topic)
-
-    attributes_topic = topic.attributes.txt
-    attributes_qos = topic.attributes.qos
-    attributes_pack = init_seri(attributes_topic)
-
-    teleindication_topic = topic.teleindication.txt
-    teleindication_qos = topic.teleindication.qos
-
-    rpc_topic = topic.rpc.txt
-    rpc_qos = topic.rpc.qos
-
-    connect_topic = topic.connect.txt
-    connect_qos = topic.connect.qos
-
-    disconnect_topic = topic.disconnect.txt
-    disconnect_qos = topic.disconnect.qos
-
-    gtelemetry_topic = topic.gtelemetry.txt
-    gtelemetry_qos = topic.gtelemetry.qos
-    gtelemetry_pack = init_seri(gtelemetry_topic)
-
-    gattributes_topic = topic.gattributes.txt
-    gattributes_qos = topic.gattributes.qos
-
-    greq_topic = topic.greq.txt
-    greq_qos = topic.greq.qos
-
-    gresp_topic = topic.gresp.txt
-    gresp_qos =  topic.gresp.qos
-
-    handler_map[rpc_topic] = handle_rpc
-    handler_map[gattributes_topic] = handle_config
-    handler_map[greq_topic] = handle_req
-end
-
-local function handle_request(msg, cli)
-    cli:acknowledge(msg)
-    if msg.dup then
-        log.debug(log_prefix, text.dup_req, msg.topic)
-    end
-    local h = handler_map[msg.topic]
-    if h then
-        h(msg, cli)
-    else
-        log.error(log_prefix, text.invalid_req, msg.topic)
-    end
-end
-
 local command = {}
-
 function command.stop()
     running = false
     local ok, err = client:disconnect()
@@ -520,7 +193,10 @@ function command.data(dev, data)
 end
 
 local attributes_map = {
-    [api.infokey] = "edgeinfo"
+    [api.infokey] = "edgeinfo",
+    vpn = "vpn",
+    frp = "frp",
+    repo = "repo"
 }
 
 local post_map = {
@@ -634,6 +310,350 @@ function command.post(k, ...)
         f(...)
     else
         log.error(log_prefix, text.invalid_post)
+    end
+end
+
+--[[
+payload = {
+    "device":"",
+    "data":{
+        "id": $request_id,
+        "method":"",
+        "params":{}
+    }
+  }
+--]]
+local function decode_rpc(msg)
+    local request = seri.unpack(msg.payload)
+    if type(request) ~= "table" then
+        log.error(log_prefix, text.unpack_fail)
+        return false
+    end
+    if type(request.device) ~= "string" then
+        log.error(log_prefix, text.unknown_dev)
+        return false
+    end
+    if type(request.data) == "table" then
+        local data = request.data
+        if data.id and data.method and data.params then
+            if data.params.value then
+                return  request.device, data.method, data.params.value, data.id
+            else
+                -- table param
+                return  request.device, data.method, data.params, data.id
+            end
+        else
+            log.error(log_prefix, text.invalid_req)
+            return false
+        end
+    else
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+end
+
+--[[
+payload = {
+    "device":"",
+    "id": $request_id,
+    "data":{}
+  }
+--]]
+local function respond_rpc(cli, dev, ret, session)
+    local response = {
+        device = dev,
+        id = session,
+        data = ret
+    }
+    local payload = seri.pack(response)
+    if not payload then
+        log.error(log_prefix, text.pack_fail)
+        return
+    end
+    local msg = {}
+    msg.topic = rpc_topic
+    msg.qos = rpc_qos
+    msg.payload = payload
+    ensure_publish(cli, msg)
+end
+
+local forked = 0
+local function busy_rpc()
+    if forked < cocurrency then
+        forked = forked + 1
+        return false
+    else
+        return true
+    end
+end
+local function done_rpc()
+    forked = forked - 1
+end
+
+local function handle_rpc(msg, cli)
+    if busy_rpc() then
+        log.error(log_prefix, text.busy)
+    else
+        skynet.fork(function()
+            local dev, cmd, arg, session = decode_rpc(msg)
+            log.info(log_prefix, "decoded rpc", dev, cmd, dump(arg))
+            if dev then
+                local ok, ret = api.external_request(dev, cmd, arg)
+                if ret then
+                    respond_rpc(cli, dev, { ok, ret }, session)
+                else
+                    respond_rpc(cli, dev, ok, session)
+                end
+            end
+            done_rpc()
+        end)
+    end
+end
+
+local function unpack_conf(conf)
+    local c = seri.unpack(conf)
+    if type(c) == "table" then
+        return c
+    else
+        log.error(log_prefix, text.unpack_fail)
+        error(text.unpack_fail)
+    end
+end
+
+local function unpack_vpn(conf)
+    local c = unpack_conf(conf)
+    local crypt = require "skynet.crypt"
+    c.key = crypt.desdecode(sys_secret, c.key)
+    return { [api.vpnappid] = c }
+end
+
+local function unpack_frp(conf)
+    return { [api.frpappid] = unpack_conf(conf) }
+end
+
+local function unpack_repo(conf)
+    return { repo = unpack_conf(conf) }
+end
+
+local conf_map = {
+    southapps = function(conf)
+        local c = unpack_conf(conf)
+        if type(c.apps) == "table" then
+            local apps = c.apps
+            local app_name, device_name, tag_name
+            for i, app in pairs(apps) do
+                app_name = string.format("%s_%s", app.app_name, app.app_version)
+                app.app_name = nil
+                app.app_version = nil
+                if type(app.devices) == "table" then
+                    local devices = {}
+                    for _, device in pairs(app.devices) do
+                        device_name = device.device_name
+                        device.device_name = nil
+                        if type(device.tags) == "table" then
+                            local tags = {}
+                            for _, tag in pairs(device.tags) do
+                                tag_name = tag.tag_name
+                                tag.tag_name = nil
+                                tags[tag_name] = tag
+                            end
+                            device.tags = tags
+                        end
+                        devices[device_name] = device
+                    end
+                    app.devices = devices
+                end
+                apps[i] = { [app_name] = app }
+            end
+        end
+        return c
+    end,
+    vpn = unpack_vpn,
+    frp = unpack_frp,
+    repo = unpack_repo
+}
+
+local function decode_config(msg)
+    local conf = seri.unpack(msg.payload)
+    if type(conf) ~= "table" then
+        log.error(log_prefix, text.unpack_fail)
+        error(text.unpack_fail)
+    end
+    log.info(log_prefix, "origin config", dump(conf))
+
+    local k, v = next(conf)
+    local f = conf_map[k]
+    if f then
+        conf = f(v)
+        log.info(log_prefix, "decoded config", dump(conf))
+        return k, conf
+    else
+        log.error(log_prefix, text.invalid_conf, tostring(k))
+        error(text.invalid_conf)
+    end
+end
+
+
+local function respond_config(key, ok, err)
+    command.post("gattributes", api.iotedgedev, { [key] = { ok, err } })
+end
+
+local function handle_config(msg, cli)
+    skynet.fork(function()
+        local ok, key, conf = pcall(decode_config, msg)
+        if ok and conf then
+            local err
+            ok, err = api.sys_request("configure", conf)
+            if ok then
+                log.info(log_prefix, text.configure_suc)
+            else
+                log.error(log_prefix, text.configure_fail, err)
+            end
+            respond_config(key, ok, err)
+        else
+            log.error(log_prefix, text.configure_fail, key)
+        end
+    end)
+end
+
+local req_map = {
+    open_console = api.frpappid,
+    open_vpn = api.frpappid,
+    close_vpn = api.frpappid,
+    vpn_info = api.vpnappid,
+    upgrade = api.sysappid
+}
+
+--[[
+msg = {
+    topic=request_id
+    }
+payload = {
+    "method":"",
+    "params":{}
+    }
+--]]
+local function decode_req(msg)
+    local request = seri.unpack(msg.payload)
+    if type(request) ~= "table" then
+        log.error(log_prefix, text.unpack_fail)
+        return false
+    end
+    local dev = req_map[request.method]
+    if not dev then
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+    if type(request.params) ~= "table" then
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+    local session = msg.topic:match("^.+/([^/]+)$")
+    if math.tointeger(session) then
+        if request.params.value then
+            return dev, request.method, request.params.value, session
+        else
+            -- table param
+            return dev, request.method, request.params, session
+        end
+    else
+        log.error(log_prefix, text.invalid_req)
+        return false
+    end
+end
+
+local function respond_req(cli, ret, session)
+    local payload = seri.pack(ret)
+    if not payload then
+        log.error(log_prefix, text.pack_fail)
+        return
+    end
+    local msg = {}
+    msg.topic = gresp_topic.."/"..session
+    msg.qos = gresp_qos
+    msg.payload = payload
+    ensure_publish(cli, msg)
+end
+
+local function handle_req(msg, cli)
+    if busy_rpc() then
+        log.error(log_prefix, text.busy)
+    else
+        skynet.fork(function()
+            local dev, cmd, arg, session = decode_req(msg)
+            log.info(log_prefix, "decoded req", dev, cmd, dump(arg))
+            if dev then
+                local ok, ret = api.external_request(dev, cmd, arg)
+                if ret then
+                    respond_req(cli, { ok, ret }, session)
+                else
+                    respond_req(cli, ok, session)
+                end
+                done_rpc()
+            end
+        end)
+    end
+end
+
+local handler_map = {}
+
+local function init_seri(topic)
+    if topic:match("^.+/zip$") then
+        return seri.zpack
+    else
+        return seri.pack
+    end
+end
+
+local function init_topics(topic)
+    telemetry_topic = topic.telemetry.txt
+    telemetry_qos = topic.telemetry.qos
+    telemetry_pack = init_seri(telemetry_topic)
+
+    attributes_topic = topic.attributes.txt
+    attributes_qos = topic.attributes.qos
+    attributes_pack = init_seri(attributes_topic)
+
+    teleindication_topic = topic.teleindication.txt
+    teleindication_qos = topic.teleindication.qos
+
+    rpc_topic = topic.rpc.txt
+    rpc_qos = topic.rpc.qos
+
+    connect_topic = topic.connect.txt
+    connect_qos = topic.connect.qos
+
+    disconnect_topic = topic.disconnect.txt
+    disconnect_qos = topic.disconnect.qos
+
+    gtelemetry_topic = topic.gtelemetry.txt
+    gtelemetry_qos = topic.gtelemetry.qos
+    gtelemetry_pack = init_seri(gtelemetry_topic)
+
+    gattributes_topic = topic.gattributes.txt
+    gattributes_qos = topic.gattributes.qos
+
+    greq_topic = topic.greq.txt
+    greq_qos = topic.greq.qos
+
+    gresp_topic = topic.gresp.txt
+    gresp_qos =  topic.gresp.qos
+
+    handler_map[rpc_topic] = handle_rpc
+    handler_map[gattributes_topic] = handle_config
+    handler_map[greq_topic] = handle_req
+end
+
+local function handle_request(msg, cli)
+    cli:acknowledge(msg)
+    if msg.dup then
+        log.debug(log_prefix, text.dup_req, msg.topic)
+    end
+    local h = handler_map[msg.topic]
+    if h then
+        h(msg, cli)
+    else
+        log.error(log_prefix, text.invalid_req, msg.topic)
     end
 end
 
