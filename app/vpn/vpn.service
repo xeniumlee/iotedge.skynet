@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=notify
 WorkingDirectory=WORKING_DIR
 ExecStart=/usr/sbin/openvpn \
-          --status ./run/vpn-status.log \
+          --status ./logs/vpn-status.log \
           --config ./run/vpn.conf \
           --status-version 2 \
           --suppress-timestamps

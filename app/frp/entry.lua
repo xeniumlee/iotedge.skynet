@@ -86,7 +86,7 @@ local function reg_cmd()
 end
 
 local function get_vpninfo()
-    return api.external_request(sys.vpnappid, "vpn_info")
+    return api.external_request(api.vpnappid, "vpn_info")
 end
 
 local function init_conf(cfg)
