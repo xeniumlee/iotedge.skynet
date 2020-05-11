@@ -611,6 +611,11 @@ local function init_seri(topic)
     end
 end
 
+local function greq_prefix(greq)
+    local prefix = greq:match("^(.+)/[%+%d]+$")
+    return prefix
+end
+
 local function init_topics(topic)
     telemetry_topic = topic.telemetry.txt
     telemetry_qos = topic.telemetry.qos
@@ -647,7 +652,7 @@ local function init_topics(topic)
 
     handler_map[rpc_topic] = handle_rpc
     handler_map[gattributes_topic] = handle_config
-    handler_map[greq_topic] = handle_req
+    handler_map[greq_prefix(greq_topic)] = handle_req
 end
 
 local function handle_request(msg, cli)
@@ -659,7 +664,12 @@ local function handle_request(msg, cli)
     if h then
         h(msg, cli)
     else
-        log.error(log_prefix, text.invalid_req, msg.topic)
+        h = handler_map[greq_prefix(msg.topic)]
+        if h then
+            h(msg, cli)
+        else
+            log.error(log_prefix, text.invalid_req, msg.topic)
+        end
     end
 end
 

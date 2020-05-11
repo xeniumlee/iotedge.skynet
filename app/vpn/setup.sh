@@ -26,6 +26,9 @@ setup_eth() {
     ip link set $eth up
 
     eth_ip=$(ip -4 addr show $eth |grep -Po 'inet \K[\d./]+')
+    if [ -n "$eth_ip" ]; then
+        ip addr del $eth_ip dev $eth
+    fi
 }
 
 setup_tap() {
@@ -39,10 +42,7 @@ setup_tap() {
 init_bridge() {
     # https://www.spinics.net/lists/linux-omap/msg145772.html
     echo 3 > /sys/class/net/$br/bridge/default_pvid
-    ip addr add $eth_ip dev $br
-    ip addr del $eth_ip dev $eth
     ip link set $br up
-
     ip link set $eth master $br
     ip link set $tap master $br
 }
@@ -52,20 +52,19 @@ setup_bridge() {
     if [ $? -ne 0 ]; then
         if [ -n "$eth_ip" ]; then
             ip link add $br type bridge
+            ip addr add $eth_ip dev $br
             init_bridge
         else
             exit 1
         fi
     else
-        if [ -n "$eth_ip" ]; then
-            ip link del $br
-            ip link add $br type bridge
+        br_ip=$(ip -4 addr show $br |grep -Po 'inet \K[\d./]+')
+        if [ -n "$br_ip" ]; then
+            eth_ip=$br_ip
             init_bridge
         else
-            eth_ip=$(ip -4 addr show $br |grep -Po 'inet \K[\d./]+')
             if [ -n "$eth_ip" ]; then
-                ip link del $br
-                ip link add $br type bridge
+                ip addr add $eth_ip dev $br
                 init_bridge
             else
                 exit 1
