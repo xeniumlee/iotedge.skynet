@@ -27,10 +27,6 @@ local sys = {
     gateway_global = "iotedge-gateway",
 }
 
-function sys.exec(cmd)
-    return execute(cmd)
-end
-
 function sys.exec_with_return(cmd)
     if type(cmd) == "string" then
         local f = io.popen(cmd)
@@ -140,16 +136,20 @@ function sys.disable_svc(svc)
     return handle_svc("disable", svc)
 end
 
-function sys.start_svc(svc)
-    return handle_svc("restart", svc)
-end
-
 function sys.stop_svc(svc)
     return handle_svc("stop", svc)
 end
 
+function sys.start_svc(svc)
+    handle_svc("restart", svc)
+    skynet.sleep(20)
+    return handle_svc("status", svc)
+end
+
 function sys.reload_svc(svc)
-    return handle_svc("reload", svc)
+    handle_svc("reload", svc)
+    skynet.sleep(20)
+    return handle_svc("status", svc)
 end
 
 ------------------------------------------
