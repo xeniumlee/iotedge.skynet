@@ -336,9 +336,17 @@ local function decode_rpc(msg)
         local data = request.data
         if data.id and data.method and data.params then
             if data.params.value then
+                log.info(log_prefix, "decoded rpc",
+                    request.device,
+                    data.method,
+                    data.params.value)
                 return  request.device, data.method, data.params.value, data.id
             else
                 -- table param
+                log.info(log_prefix, "decoded rpc",
+                    request.device,
+                    data.method,
+                    dump(data.params))
                 return  request.device, data.method, data.params, data.id
             end
         else
@@ -395,7 +403,6 @@ local function handle_rpc(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_rpc(msg)
-            log.info(log_prefix, "decoded rpc", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then
@@ -524,6 +531,9 @@ end
 
 local req_map = {
     open_console = api.frpappid,
+    close_console = api.frpappid,
+    open_ssh = api.frpappid,
+    close_ssh = api.frpappid,
     open_vpn = api.frpappid,
     close_vpn = api.frpappid,
     vpn_info = api.vpnappid,
@@ -557,9 +567,17 @@ local function decode_req(msg)
     local session = msg.topic:match("^.+/([^/]+)$")
     if math.tointeger(session) then
         if request.params.value then
+            log.info(log_prefix, "decoded req",
+                dev,
+                request.method,
+                request.params.value)
             return dev, request.method, request.params.value, session
         else
             -- table param
+            log.info(log_prefix, "decoded req",
+                dev,
+                request.method,
+                dump(request.params))
             return dev, request.method, request.params, session
         end
     else
@@ -587,16 +605,15 @@ local function handle_req(msg, cli)
     else
         skynet.fork(function()
             local dev, cmd, arg, session = decode_req(msg)
-            log.info(log_prefix, "decoded req", dev, cmd, dump(arg))
             if dev then
                 local ok, ret = api.external_request(dev, cmd, arg)
                 if ret then
-                    respond_req(cli, { ok, ret }, session)
+                    respond_req(cli, { res = ok, ret = ret }, session)
                 else
-                    respond_req(cli, ok, session)
+                    respond_req(cli, { res = ok }, session)
                 end
-                done_rpc()
             end
+            done_rpc()
         end)
     end
 end
