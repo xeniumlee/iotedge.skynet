@@ -16,7 +16,6 @@ local keepalive_timeout = 6000
 
 local sys_uri = ""
 local sys_id = ""
-local sys_secret
 
 local telemetry_topic = ""
 local telemetry_qos = 1
@@ -415,7 +414,6 @@ local function unpack_conf(conf)
     if type(c) == "table" then
         return c
     else
-        log.error(log_prefix, text.unpack_fail)
         error(text.unpack_fail)
     end
 end
@@ -423,7 +421,8 @@ end
 local function unpack_vpn(conf)
     local c = unpack_conf(conf)
     local crypt = require "skynet.crypt"
-    c.key = crypt.desdecode(sys_secret, c.key)
+    local basexx = require "utils.basexx"
+    c.key = crypt.desdecode("DES_2020", basexx.from_base64(c.key), 1)
     return { [api.vpnappid] = c }
 end
 
@@ -477,41 +476,48 @@ local function decode_config(msg)
     local conf = seri.unpack(msg.payload)
     if type(conf) ~= "table" then
         log.error(log_prefix, text.unpack_fail)
-        error(text.unpack_fail)
+        return false
     end
     log.info(log_prefix, "origin config", dump(conf))
 
     local k, v = next(conf)
     local f = conf_map[k]
     if f then
-        conf = f(v)
-        log.info(log_prefix, "decoded config", dump(conf))
-        return k, conf
+        local ok, c = pcall(f, v)
+        if ok then
+            log.info(log_prefix, "decoded config", dump(c))
+        else
+            log.error(log_prefix, "decode config fail", c)
+        end
+        return ok, k, c
     else
-        log.error(log_prefix, text.invalid_conf, tostring(k))
-        error(text.invalid_conf)
+        log.error(log_prefix, "unknown config key", tostring(k))
+        return false
     end
 end
 
-
 local function respond_config(key, ok, err)
-    command.post("gattributes", api.iotedgedev, { [key] = { ok, err } })
+    command.post("gattributes", api.iotedgedev, { [key] = { res = ok, err = err } })
 end
 
 local function handle_config(msg, cli)
     skynet.fork(function()
-        local ok, key, conf = pcall(decode_config, msg)
-        if ok and conf then
+        local ok, key, conf = decode_config(msg)
+        if ok then
             local err
             ok, err = api.sys_request("configure", conf)
             if ok then
                 log.info(log_prefix, text.configure_suc)
+                respond_config(key, ok, err)
+                api.external_request(api.hostappid, "post_attr")
             else
                 log.error(log_prefix, text.configure_fail, err)
+                respond_config(key, ok, err)
             end
-            respond_config(key, ok, err)
         else
-            log.error(log_prefix, text.configure_fail, key)
+            if key then
+                respond_config(key, ok, conf)
+            end
         end
     end)
 end
@@ -672,7 +678,6 @@ local function init()
         init_topics(conf.topic)
         sys_uri = conf.uri
         sys_id = conf.id
-        sys_secret = string.sub(conf.username, 1, 8)
         cocurrency = conf.cocurrency
 
         client = mqtt.client {

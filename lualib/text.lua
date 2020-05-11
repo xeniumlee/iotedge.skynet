@@ -134,7 +134,6 @@ local text = {
     mqtt = {
         invalid_req = "invalid request received",
         invalid_post = "invalid post received",
-        invalid_conf = "invalid configuration received",
         dup_req = "duplicated request received",
         pack_fail = "pack failed",
         unpack_fail = "unpack failed",

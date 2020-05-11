@@ -7,6 +7,16 @@ local http = require "utils.http"
 local uri = "http://localhost:9100/metrics"
 local svc = "nodeexporter"
 
+local cmd_desc = {
+    post_attr = "Post attributes",
+}
+
+local function reg_cmd()
+    for k, v in pairs(cmd_desc) do
+        api.reg_cmd(k, v)
+    end
+end
+
 local function fetch()
     local m = http.get(uri)
     if m then
@@ -44,22 +54,29 @@ local function post_telemetry(tags)
     end
 end
 
-local function post_attributes()
-    local post = api.post_gattr
-    local key = api.infokey
-    while true do
-        local info = api.sys_request("info")
-        if info then
-            for _, app in pairs(info.apps) do
-                app.conf = nil
-            end
-            info.frp = api.external_request(api.frpappid, "list_proxy")
-            --info.vpn = api.external_request(api.vpnappid, "vpn_info")
-
-            post({ [key] = info })
+local function do_post_attr()
+    local info = api.sys_request("info")
+    if info then
+        for _, app in pairs(info.apps) do
+            app.conf = nil
         end
+        info.frp = api.external_request(api.frpappid, "list_proxy")
+        --info.vpn = api.external_request(api.vpnappid, "vpn_info")
+
+        api.post_gattr({ [api.infokey] = info })
+    end
+end
+
+local function post_attributes()
+    while true do
+        do_post_attr()
         skynet.sleep(30000)
     end
+end
+
+function post_attr()
+    skynet.fork(do_post_attr)
+    return true
 end
 
 function on_conf(cfg)
@@ -82,3 +99,5 @@ function on_conf(cfg)
     end
     return ok
 end
+
+reg_cmd()
