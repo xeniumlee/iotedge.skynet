@@ -269,24 +269,25 @@ local function validate_existing_conf(arg)
 end
 
 local function load_app(id, tpl)
-    local name = sysapp(id) and id or tpl.."_"..id
+    local app = {
+        name = sysapp(id) and id or tpl.."_"..id,
+        tpl = tpl,
+        conf = false,
+        route = {}
+    }
     -- to reserve id
-    applist[id] = { name = name }
+    applist[id] = app
 
-    local ok, addr = pcall(skynet.newservice, "appcell", tpl, name)
+    local ok, addr = pcall(skynet.newservice, "appcell", app.tpl, app.name)
     if ok then
-        applist[id] = {
-            addr = addr,
-            load_time = api.datetime(),
-            tpl = tpl,
-            conf = false,
-            route = {}
-        }
+        app.addr = addr
+        app.load_time = api.datetime()
+
         appmonitor[addr] = {
-            id = name,
+            id = app.name,
             counter = 0
         }
-        log.info(text.load_suc, name)
+        log.info(text.load_suc, app.name)
         return true
     else
         applist[id] = nil
