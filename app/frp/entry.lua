@@ -91,10 +91,22 @@ local function reg_cmd()
     end
 end
 
+local function init_proxylist(conf)
+    for k, v in pairs(conf) do
+        if v.name ~= "vpn" then
+            local p = proxylist[v.name]
+            if p then
+                p.remote_port = v.remote_port
+            end
+        end
+    end
+end
+
 local function init_conf(cfg)
     local ok, conf = pcall(ini.parse, frpcini)
     if ok then
         frpcconf = conf
+        init_proxylist(conf)
     end
     frpcconf.common.server_addr = cfg.server_addr
     frpcconf.common.server_port = cfg.server_port
