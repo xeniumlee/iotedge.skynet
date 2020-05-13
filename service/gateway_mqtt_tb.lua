@@ -50,9 +50,9 @@ local function ensure_subscribe(cli, topic, qos)
 
     local function suback(ack)
         if ack.rc[1] ~= subsribe_ack_err_code then
+            log.info(log_prefix, text.sub_suc, topic)
             -- Strictly rc[1] >= qos
             done = true
-            log.info(log_prefix, text.sub_suc, topic)
         else
             log.error(log_prefix, text.sub_fail, topic)
         end
@@ -70,6 +70,7 @@ local function ensure_subscribe(cli, topic, qos)
             skynet.sleep(sub_retry_timeout)
         else
             log.error(log_prefix, text.sub_fail, topic)
+            done = true
         end
     end
 end
@@ -115,6 +116,7 @@ local function ensure_publish(cli, msg, dev)
             else
                 log.error(log_prefix, text.pub_fail, msg.topic)
             end
+            done = true
         end
     end
 end

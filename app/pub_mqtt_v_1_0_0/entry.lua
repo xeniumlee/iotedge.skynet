@@ -30,8 +30,8 @@ local function ensure_publish(cli, msg, dev)
     local count = 0
 
     local function puback()
-        done = true
         log.debug(log_prefix, text.pub_suc, msg.topic)
+        done = true
     end
     while running and not done do
         if count < pub_retry_count then
@@ -55,6 +55,7 @@ local function ensure_publish(cli, msg, dev)
             else
                 log.error(log_prefix, text.pub_fail, msg.topic)
             end
+            done = true
         end
     end
 end

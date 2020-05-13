@@ -13,14 +13,19 @@ local timeout = 50 -- 0.5 second
 local protocol = "ws"
 local fds = {}
 
-local function close(fd)
+local err = {
+    stopped = { code = 4000, reason = "server stopped" },
+    notarget = { code = 4001, reason = "unknown target" },
+}
+
+local function close(fd, e)
     fds[fd] = nil
-    websocket.close(fd)
+    websocket.close(fd, e.code, e.reason)
 end
 
 local function close_all()
     for fd, _ in pairs(fds) do
-        close(fd)
+        close(fd, err.stopped)
     end
 end
 
@@ -52,21 +57,20 @@ function handle.handshake(fd, header, url)
         }
         fds[fd] = ch
     else
-        log.info(text.invalid_target, url, dump(header))
-        close(fd)
+        log.error(text.invalid_target, url, dump(header))
+        close(fd, err.notarget)
     end
 end
 
 function handle.close(fd, code, reason)
     log.info(text.closed, tostring(code), reason)
-    close(fd)
 end
 
 function handle.message(fd, msg)
     local ch = fds[fd]
     if not ch then
         log.error(text.invalid_request)
-        close(fd)
+        close(fd, err.notarget)
         return
     end
 
@@ -87,7 +91,7 @@ function handle.message(fd, msg)
         end
     else
         drop = true
-        log.error(text.timeout, ch.__host, ch.__port)
+        log.error(text.target_timeout, ch.__host, ch.__port)
     end
 end
 
