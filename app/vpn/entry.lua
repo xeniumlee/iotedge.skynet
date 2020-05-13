@@ -135,7 +135,7 @@ local function refresh_info(cfg)
 end
 
 local function init_conf(cfg)
-    local ipaddr = install(true, "enp0s9")
+    local ipaddr = install(true, cfg.eth)
     if ipaddr then
         local ok = gen_server_bridge(cfg, ipaddr)
         if ok then
