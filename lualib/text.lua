@@ -29,6 +29,16 @@ local text = {
         online = "APP online",
         offline = "APP offline"
     },
+    wsproxy = {
+        handshake = "websocket handshake to",
+        connect = "websocket connection opened",
+        closed = "websocket connection closed",
+        error = "websocket connection error",
+        timeout = "websocket target timeout",
+        target_error = "websocket target error",
+        invalid_target = "invalid target host:port",
+        invalid_request = "invalid reqeust received",
+    },
     modbus = {
         invalid_fc_conf = "invalid function code configuration",
         invalid_unit = "invalid device of response",

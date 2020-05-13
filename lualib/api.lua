@@ -35,6 +35,7 @@ local api = {
     iotedgedev = "iotedge",
     gateway_addr = gateway_addr,
     store_addr = store_addr,
+    post_delay = 500, -- 5 seconds
     batch_max = 200,
     ttl_max = 60 -- day
 }

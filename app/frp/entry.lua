@@ -9,6 +9,7 @@ local api = require "api"
 local running = false
 local frpcini = sys.run_root.."/frpc.ini"
 local svc = "frpc"
+local localhost = "127.0.0.1"
 
 local frpcconf = {
     common = {
@@ -24,23 +25,25 @@ local proxylist = {
     ssh = {
         name = "ssh",
         type = "tcp",
-        local_ip = "127.0.0.1",
-        local_port = 22
+        local_port = sys.ssh_port
     },
     console = {
         name = "console",
         type = "tcp",
-        local_ip = "127.0.0.1",
         local_port = sys.console_port
     },
     ws = {
         name = "ws",
         type = "tcp",
-        local_ip = "127.0.0.1",
         local_port = sys.ws_port
     },
+    vnc = {
+        name = "vnc",
+        type = "tcp",
+        local_port = sys.ws_proxy_port
+    },
     vpn = {
-        local_ip = "127.0.0.1",
+        name = "vpn",
         local_port = sys.vpn_port
     }
 }
@@ -64,6 +67,7 @@ local vpn_type = {
     tcp4 = "stcp",
     udp4 = "sudp"
 }
+local default_vpn_type = "sudp"
 
 local cmd_desc = {
     open_console = "<remote_port>",
@@ -74,6 +78,8 @@ local cmd_desc = {
     close_ws = "Close websocket port",
     open_vpn = "<token>",
     close_vpn = "<token>",
+    open_vnc = "<remote_port>",
+    close_vnc = "Close vnc port",
     open_proxy = "{ name=<string>, type=<string>, local_ip=<string>, local_port=<number>, remote_port=<number> }",
     close_proxy = "<name>",
     list_proxy = "list all opened proxy"
@@ -83,10 +89,6 @@ local function reg_cmd()
     for k, v in pairs(cmd_desc) do
         api.reg_cmd(k, v)
     end
-end
-
-local function get_vpninfo()
-    return api.external_request(api.vpnappid, "vpn_info")
 end
 
 local function init_conf(cfg)
@@ -113,18 +115,6 @@ local function init_conf(cfg)
     return ok
 end
 
-local function update(name, p)
-    if (frpcconf[name] and not p) or p then
-        frpcconf[name] = p
-        ini.save(frpcini, frpcconf)
-        local ok, err = sys.reload_svc(svc)
-        log.info(err)
-        return ok
-    else
-        return false, text.invalid_arg
-    end
-end
-
 local function dup(proxy)
     for name, p in pairs(frpcconf) do
         if proxy.name == name or
@@ -138,20 +128,90 @@ local function dup(proxy)
     return false
 end
 
-local function dup_vpn(name)
-    for n, _ in pairs(frpcconf) do
-        if n == name then
-            return true
-        end
-    end
-    return false
+local function get_vpninfo()
+    return api.external_request(api.vpnappid, "vpn_info")
 end
 
-local function do_open(name, p)
-    return update(name, p)
+local function reload()
+    ini.save(frpcini, frpcconf)
+    local ok, err = sys.reload_svc(svc)
+    if ok then
+        log.info(err)
+    else
+        log.error(err)
+    end
+    return ok, err
 end
-local function do_close(name)
-    return update(name)
+
+local function make_name(prefix, remote_port)
+    return string.format("%s-%d", prefix, remote_port)
+end
+
+local function do_open(proxy, remote_port)
+    if not running then
+        return false, text.app_stopped
+    end
+
+    local p = tonumber(remote_port)
+    if not p then
+        return false, text.invalid_arg
+    end
+
+    local name = make_name(proxy.name, p)
+    if frpcconf[name] then
+        return false, text.invalid_arg
+    end
+
+    proxy.local_ip = localhost
+    proxy.remote_port = p
+    frpcconf[name] = proxy
+    return reload()
+end
+local function do_close(proxy)
+    if not running then
+        return false, text.app_stopped
+    end
+
+    local name
+    if type(proxy) == "string" then
+        name = proxy
+    else
+        name = make_name(proxy.name, proxy.remote_port)
+    end
+    if frpcconf[name] then
+        frpcconf[name] = nil
+        return reload()
+    else
+        return false, text.invalid_arg
+    end
+end
+
+function open_console(port)
+    return do_open(proxylist.console, port)
+end
+function close_console()
+    return do_close(proxylist.console)
+end
+
+function open_ssh(port)
+    return do_open(proxylist.ssh, port)
+end
+function close_ssh()
+    return do_close(proxylist.ssh)
+end
+
+function open_ws(port)
+    return do_open(proxylist.ws, port)
+end
+function close_ws()
+    return do_close(proxylist.ws)
+end
+
+function open_vnc(port)
+    return do_open(proxylist.vnc, port)
+end
+function close_vnc()
+    return do_close(proxylist.vnc)
 end
 
 function open_proxy(proxy)
@@ -160,15 +220,13 @@ function open_proxy(proxy)
     end
     local ok = pcall(validator.check, proxy, p_schema)
     if ok and not dup(proxy) then
-        return do_open(proxy.name, proxy)
+        frpcconf[proxy.name] = proxy
+        return reload()
     else
         return false, text.invalid_arg
     end
 end
 function close_proxy(name)
-    if not running then
-        return false, text.app_stopped
-    end
     if type(name) == "string" then
         return do_close(name)
     else
@@ -176,74 +234,21 @@ function close_proxy(name)
     end
 end
 
-function open_console(port)
-    if not running then
-        return false, text.app_stopped
-    end
-    local p = tonumber(port)
-    if p then
-        proxylist.console.remote_port = p
-        return do_open(proxylist.console.name, proxylist.console)
-    else
-        return false, text.invalid_arg
-    end
-end
-function close_console()
-    if not running then
-        return false, text.app_stopped
-    end
-    return do_close(proxylist.console.name)
-end
-
-function open_ssh(port)
-    if not running then
-        return false, text.app_stopped
-    end
-    local p = tonumber(port)
-    if p then
-        proxylist.ssh.remote_port = p
-        return do_open(proxylist.ssh.name, proxylist.ssh)
-    else
-        return false, text.invalid_arg
-    end
-end
-function close_ssh()
-    if not running then
-        return false, text.app_stopped
-    end
-    return do_close(proxylist.ssh.name)
-end
-
-function open_ws(port)
-    if not running then
-        return false, text.app_stopped
-    end
-    local p = tonumber(port)
-    if p then
-        proxylist.ws.remote_port = p
-        return do_open(proxylist.ws.name, proxylist.ws)
-    else
-        return false, text.invalid_arg
-    end
-end
-function close_ws()
-    if not running then
-        return false, text.app_stopped
-    end
-    return do_close(proxylist.ws.name)
-end
-
 function open_vpn(token)
     if not running then
         return false, text.app_stopped
     end
-    if type(token) == "string" and not dup_vpn(token) then
+    if type(token) == "string" and not frpcconf[token] then
         local vpn = get_vpninfo()
         if vpn.running then
-            proxylist.vpn.type = vpn_type[vpn.proto]
-            proxylist.vpn.name = "vpn"
-            proxylist.vpn.sk = token
-            return do_open(token, proxylist.vpn)
+            frpcconf[token] = {
+                local_port = proxylist.vpn.local_port,
+                name = proxylist.vpn.name,
+                local_ip = localhost,
+                type = vpn_type[vpn.proto] or default_vpn_type,
+                sk = token
+            }
+            return reload()
         else
             return false, text.vpn_stopped
         end
@@ -252,9 +257,6 @@ function open_vpn(token)
     end
 end
 function close_vpn(token)
-    if not running then
-        return false, text.app_stopped
-    end
     if type(token) == "string" then
         return do_close(token)
     else

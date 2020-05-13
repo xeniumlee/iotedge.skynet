@@ -16,7 +16,9 @@ end
 local sys = {
     console_port = 30000,
     ws_port = 30001,
+    ws_proxy_port = 29999,
     vpn_port = 1194,
+    ssh_port = 22,
     app_root = "app",
     db_root = "db",
     run_root = "run",

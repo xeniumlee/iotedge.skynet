@@ -30,6 +30,7 @@ end
 
 local function post_telemetry(tags)
     local post = api.post_gtelemetry
+    skynet.sleep(api.post_delay)
     while true do
         local data = {}
         local m = fetch()
@@ -68,6 +69,7 @@ local function do_post_attr()
 end
 
 local function post_attributes()
+    skynet.sleep(api.post_delay)
     while true do
         do_post_attr()
         skynet.sleep(30000)

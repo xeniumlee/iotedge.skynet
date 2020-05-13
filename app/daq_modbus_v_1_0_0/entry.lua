@@ -566,8 +566,7 @@ end
 
 local function start(d, polls)
     running = true
-    -- wait for mqtt up
-    skynet.sleep(500)
+    skynet.sleep(api.post_delay)
     regdev(d)
     math.randomseed(skynet.time())
     for _, poll in pairs(polls) do

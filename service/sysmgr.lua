@@ -378,6 +378,7 @@ function command.upgrade(version)
 
             skynet.call(cfg.appmgr, "lua", "clean", true)
             skynet.send(cfg.store, "lua", "stop")
+            skynet.send(cfg.ws_proxy, "lua", "stop")
             skynet.send(cfg.gateway_console, "lua", "stop")
             skynet.send(cfg.gateway_ws, "lua", "stop")
 
@@ -447,6 +448,11 @@ local function launch()
     cfg.store = skynet.uniqueservice("datastore")
     skynet.name(api.store_addr, cfg.store)
     log.info("Store started")
+
+    cfg.ws_proxy = skynet.uniqueservice(
+        "ws_proxy",
+        sys.ws_proxy_port)
+    log.info("Websocket proxy started")
 
     cfg.gateway_console = skynet.uniqueservice(
         "gateway_console",
