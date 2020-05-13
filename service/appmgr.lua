@@ -726,7 +726,7 @@ function command.pipe_stop(arg)
 end
 
 function command.info()
-    sysinfo.sys.uptime = string.format("%d seconds", math.floor(skynet.now()/100))
+    sysinfo.sys.uptime = skynet.now()//100
     return sysinfo
 end
 
