@@ -614,6 +614,9 @@ local function handle_req(msg, cli)
                 else
                     respond_req(cli, { res = ok }, session)
                 end
+                if ok then
+                    api.external_request(api.hostappid, "post_attr")
+                end
             end
             done_rpc()
         end)

@@ -269,14 +269,13 @@ local function validate_existing_conf(arg)
 end
 
 local function load_app(id, tpl)
-    -- to reserve id
-    applist[id] = {}
-
     local name = sysapp(id) and id or tpl.."_"..id
+    -- to reserve id
+    applist[id] = { name = name }
+
     local ok, addr = pcall(skynet.newservice, "appcell", tpl, name)
     if ok then
         applist[id] = {
-            name = name,
             addr = addr,
             load_time = api.datetime(),
             tpl = tpl,
