@@ -14,6 +14,7 @@ files["examples/*.lua"].ignore = {"111"}
 
 -- accessing undefined variable
 files["lualib/utils/inifile.lua"].ignore = {"113"}
+files["service/ws_proxy.lua"].ignore = {"113"}
 
 -- Value assigned to a local variable is unused
 files["lualib/seri/MessagePack.lua"].ignore = {"311"}

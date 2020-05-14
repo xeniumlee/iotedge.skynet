@@ -1,39 +1,70 @@
 local skynet = require "skynet"
 local socket = require "skynet.socket"
-local socketchannel = require "skynet.socketchannel"
+local sockethelper = require "http.sockethelper"
 local websocket = require "http.websocket"
 local log = require "log"
 local text = require("text").wsproxy
 local dump = require "utils.dump"
 
-local ip = "127.0.0.1"
-local port = ...
-local timeout = 50 -- 0.5 second
+local listen_ip = "127.0.0.1"
+local listen_port = ...
 
-local protocol = "ws"
-local fds = {}
+if listen_port == "agent" then
 
-local err = {
-    stopped = { code = 4000, reason = "server stopped" },
-    notarget = { code = 4001, reason = "unknown target" },
+local ws_err = {
+    socket_error = { code = 4000, reason = "socket_error" },
+    no_target = { code = 4001, reason = "unknown target" },
+    target_offline = { code = 4002, reason = "can't connect to target" },
 }
 
-local function close(fd, e)
-    fds[fd] = nil
-    websocket.close(fd, e.code, e.reason)
-end
+local fds = {}
+local handle = {}
 
-local function close_all()
-    for fd, _ in pairs(fds) do
-        close(fd, err.stopped)
+local function close_target(fd)
+    local t = fds[fd]
+    if t then
+        t.close()
+        fds[fd] = nil
     end
 end
 
-local function handle_resp(so)
-    return true, socket.read(so)
+local function close(fd, e)
+    websocket.close(fd, e.code, e.reason)
+    close_target(fd)
 end
 
-local handle = {}
+local function do_proxy(fd, host, port, fmt)
+    local timeout = 500
+    local ok, id = pcall(sockethelper.connect, host, port, timeout)
+    if ok then
+        local target = {
+            host = host,
+            port = port,
+            write = sockethelper.writefunc(id),
+            read = sockethelper.readfunc(id),
+            close = function () sockethelper.close(id) end
+        }
+        fds[fd] = target
+        while true do
+            local msg
+            ok, msg = pcall(target.read)
+            if ok then
+                ok = pcall(websocket.write, fd, msg, fmt)
+                if not ok then
+                    log.error(text.target_error, err)
+                end
+            else
+                log.error(text.error, err)
+                close(fd, ws_err.socket_error)
+                break
+            end
+        end
+    else
+        log.error(text.target_offline, host, port)
+        close(fd, ws_err.target_offline)
+    end
+end
+
 function handle.connect(fd)
     log.info(text.connect, tostring(fd))
 end
@@ -46,63 +77,64 @@ function handle.pong(fd)
 end
 
 function handle.handshake(fd, header, url)
-    local h, p = url:match("^.+target/([%d%.]+):(%d+)$")
-    if h and p then
+    local h, p, fmt = url:match("^.+target/([%d%.]+):(%d+)%?fmt=([^&]+)$")
+    if h and p and (fmt == "text" or fmt == "binary") then
         log.info(text.handshake, h, p, dump(header))
-
-        local ch = socketchannel.channel {
-            host = h,
-            port = p,
-            nodelay = true
-        }
-        fds[fd] = ch
+        skynet.fork(do_proxy, fd, h, p, fmt)
     else
-        log.error(text.invalid_target, url, dump(header))
-        close(fd, err.notarget)
+        log.error(text.invalid_url, url, dump(header))
+        close(fd, ws_err.no_target)
     end
 end
 
 function handle.close(fd, code, reason)
     log.info(text.closed, tostring(code), reason)
+    close_target(fd)
 end
 
 function handle.message(fd, msg)
-    local ch = fds[fd]
-    if not ch then
+    local t = fds[fd]
+    if not t then
         log.error(text.invalid_request)
-        close(fd, err.notarget)
+        close(fd, ws_err.no_target)
         return
     end
-
-    local ok, resp, drop
-    local co = coroutine.running()
-    skynet.fork(function()
-        ok, resp = pcall(ch.request, ch, msg, handle_resp)
-        if not drop then
-            skynet.wakeup(co)
-        end
-    end)
-    skynet.sleep(timeout)
-    if resp then
-        if ok then
-            websocket.write(fd, resp)
-        else
-            log.error(text.target_error, ch.__host, ch.__port)
-        end
-    else
-        drop = true
-        log.error(text.target_timeout, ch.__host, ch.__port)
+    local ok, err = pcall(t.write, msg)
+    if not ok then
+        log.error(text.target_error, err)
+        close(fd, ws_err.socket_error)
     end
 end
 
+skynet.start(function ()
+    skynet.dispatch("lua", function (_, _, fd, protocol, addr)
+        local ok, err = websocket.accept(fd, handle, protocol, addr)
+        if not ok then
+            log.error(text.error, tostring(fd), err)
+        end
+    end)
+end)
+
+else
+
 skynet.start(function()
+    local agent = {}
+    for i= 1, 5 do
+        agent[i] = skynet.newservice(SERVICE_NAME, "agent")
+    end
+
     local running = true
-    local listen_socket = socket.listen(ip, port)
+    local balance = 1
+    local protocol = "ws"
+    local listen_socket = socket.listen(listen_ip, listen_port)
 
     socket.start(listen_socket, function(fd, addr)
         if running then
-            fds[fd] = false
-            skynet.fork(websocket.accept, fd, handle, protocol, addr)
+            skynet.send(agent[balance], "lua", fd, protocol, addr)
+            balance = balance + 1
+            if balance > #agent then
+                balance = 1
+            end
         else
             socket.close(fd)
         end
@@ -111,7 +143,8 @@ skynet.start(function()
         if cmd == "stop" then
             running = false
             socket.close(listen_socket)
-            close_all()
         end
     end)
 end)
+
+end

@@ -34,9 +34,9 @@ local text = {
         connect = "websocket connection opened",
         closed = "websocket connection closed",
         error = "websocket connection error",
-        target_timeout = "websocket target timeout",
-        target_error = "websocket target error",
-        invalid_target = "invalid target host:port",
+        target_offline = "websocket target cannot connect",
+        target_error = "websocket target socket error",
+        invalid_url = "invalid url",
         invalid_request = "invalid reqeust received",
     },
     modbus = {
