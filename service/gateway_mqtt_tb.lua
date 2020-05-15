@@ -195,6 +195,7 @@ end
 
 local attributes_map = {
     [api.infokey] = "edgeinfo",
+    southapps = "southapps",
     vpn = "vpn",
     frp = "frp",
     repo = "repo"
