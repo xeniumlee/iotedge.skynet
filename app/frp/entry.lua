@@ -40,7 +40,6 @@ local proxylist = {
     vnc = {
         name = "vnc",
         type = "tcp",
-        local_port = sys.ws_proxy_port
     },
     vpn = {
         name = "vpn",
@@ -63,6 +62,12 @@ local p_schema = {
     remote_port = validator.port
 }
 
+local vnc_schema = {
+    local_ip = validator.ipv4,
+    local_port = validator.port,
+    remote_port = validator.port
+}
+
 local vpn_type = {
     tcp4 = "stcp",
     udp4 = "sudp"
@@ -78,8 +83,8 @@ local cmd_desc = {
     close_ws = "Close websocket port",
     open_vpn = "<token>",
     close_vpn = "<token>",
-    open_vnc = "<remote_port>",
-    close_vnc = "Close vnc port",
+    open_vnc = "{ local_ip=<string>, local_port=<number>, remote_port=<number> }",
+    close_vnc = "<remote_port>",
     open_proxy = "{ name=<string>, type=<string>, local_ip=<string>, local_port=<number>, remote_port=<number> }",
     close_proxy = "<name>",
     list_proxy = "list all opened proxy"
@@ -130,10 +135,7 @@ end
 local function dup(proxy)
     for name, p in pairs(frpcconf) do
         if proxy.name == name or
-           (proxy.type == p.type and
-           (proxy.remote_port == p.remote_port or
-            (proxy.local_ip == p.local_ip and proxy.local_port == p.local_port)
-            )) then
+           (proxy.type == p.type and proxy.remote_port == p.remote_port) then
             return true
         end
     end
@@ -219,11 +221,31 @@ function close_ws()
     return do_close(proxylist.ws)
 end
 
-function open_vnc(port)
-    return do_open(proxylist.vnc, port)
+function open_vnc(vnc)
+    if not running then
+        return false, text.app_stopped
+    end
+    local ok = pcall(validator.check, vnc, vnc_schema)
+    vnc.name = make_name(proxylist.vnc.name, vnc.remote_port)
+    vnc.type = proxylist.vnc.type
+
+    if ok and not dup(vnc) then
+        local k = vnc.name
+        vnc.name = proxylist.vnc.name
+        frpcconf[k] = vnc
+        return reload()
+    else
+        return false, text.invalid_arg
+    end
 end
-function close_vnc()
-    return do_close(proxylist.vnc)
+function close_vnc(port)
+    local p = tonumber(port)
+    if p then
+        local name = make_name(proxylist.vnc.name, p)
+        return do_close(name)
+    else
+        return false, text.invalid_arg
+    end
 end
 
 function open_proxy(proxy)

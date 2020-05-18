@@ -13,3 +13,9 @@ gateway = {
     flowcontrol = 10,
     audit = true
 }
+gateway_ws = {
+    enabled = false
+}
+ws_proxy = {
+    enabled = false
+}

@@ -26,6 +26,7 @@ local sys = {
     pipe_cfg = "run/pipe",
     meta_lua = "meta",
     entry_lua = "entry",
+    invalid_addr = "invalid_addr",
     gateway_global = "iotedge-gateway",
 }
 

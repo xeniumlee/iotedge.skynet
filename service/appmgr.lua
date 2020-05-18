@@ -452,16 +452,18 @@ end
 
 local function load_sysapp()
     local now = api.datetime()
-    applist[wsappid] = {
-        name = wsappid,
-        addr = wsapp_addr,
-        load_time = now,
-        app = "gateway_websocket",
-        conf = 30001,
-        read_only = true,
-        route = {}
-    }
-    if mqttapp_addr then
+    if wsapp_addr ~= sys.invalid_addr then
+        applist[wsappid] = {
+            name = wsappid,
+            addr = wsapp_addr,
+            load_time = now,
+            app = "gateway_websocket",
+            conf = 30001,
+            read_only = true,
+            route = {}
+        }
+    end
+    if mqttapp_addr ~= sys.invalid_addr then
         applist[mqttappid] = {
             name = mqttappid,
             addr = mqttapp_addr,

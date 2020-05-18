@@ -378,12 +378,16 @@ function command.upgrade(version)
 
             skynet.call(cfg.appmgr, "lua", "clean", true)
             skynet.send(cfg.store, "lua", "stop")
-            skynet.send(cfg.ws_proxy, "lua", "stop")
             skynet.send(cfg.gateway_console, "lua", "stop")
-            skynet.send(cfg.gateway_ws, "lua", "stop")
 
+            if cfg.ws_proxy.enabled then
+                skynet.send(cfg.ws_proxy.addr, "lua", "stop")
+            end
+            if cfg.gateway_ws.enabled then
+                skynet.send(cfg.gateway_ws.addr, "lua", "stop")
+            end
             if cfg.gateway_mqtt then
-                skynet.send(cfg.gateway_mqtt_addr, "lua", "stop")
+                skynet.send(cfg.gateway_mqtt.addr, "lua", "stop")
             end
             clean_delay()
 
@@ -449,30 +453,36 @@ local function launch()
     skynet.name(api.store_addr, cfg.store)
     log.info("Store started")
 
-    cfg.ws_proxy = skynet.uniqueservice(
-        "ws_proxy",
-        sys.ws_proxy_port)
-    log.info("Websocket proxy started")
-
     cfg.gateway_console = skynet.uniqueservice(
         "gateway_console",
         sys.console_port,
         tostring(cfg.auth.enabled))
     log.info("Console started")
 
-    cfg.gateway_ws = skynet.uniqueservice(
-        "gateway_ws",
-        sys.ws_port,
-        tostring(cfg.auth.enabled))
-    log.info("Websocket started")
-
     if cfg.gateway_mqtt then
         local c = cfg.gateway_mqtt.tpl
-        cfg.gateway_mqtt_addr = skynet.uniqueservice(c)
+        cfg.gateway_mqtt.addr = skynet.uniqueservice(c)
         log.info("MQTT started", c)
     end
 
-    cfg.appmgr = skynet.uniqueservice(true, "appmgr", cfg.gateway_ws, cfg.gateway_mqtt_addr)
+    if cfg.gateway_ws.enabled then
+        cfg.gateway_ws.addr = skynet.uniqueservice(
+            "gateway_ws",
+            sys.ws_port,
+            tostring(cfg.auth.enabled))
+        log.info("Websocket started")
+    end
+
+    if cfg.ws_proxy.enabled then
+        cfg.ws_proxy.addr = skynet.uniqueservice(
+            "ws_proxy",
+            sys.ws_proxy_port)
+        log.info("Websocket proxy started")
+    end
+
+    cfg.appmgr = skynet.uniqueservice(true, "appmgr",
+        cfg.gateway_ws.enabled and cfg.gateway_ws.addr or sys.invalid_addr,
+        cfg.gateway_mqtt and cfg.gateway_mqtt.addr or sys.invalid_addr)
     skynet.monitor("appmgr", true)
     log.info("Monitor started")
 

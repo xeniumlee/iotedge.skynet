@@ -62,7 +62,15 @@ local function do_post_attr()
             app.conf = nil
         end
         info.frp = api.external_request(api.frpappid, "list_proxy")
-        --info.vpn = api.external_request(api.vpnappid, "vpn_info")
+        local vpn = api.external_request(api.vpnappid, "vpn_info")
+        if type(vpn) == "table" and
+            vpn.interfaces and
+            vpn.interfaces.br0 then
+            local addr = vpn.interfaces.br0.addr
+            if addr then
+                info.host = addr:match("^([%d%.]+)")
+            end
+        end
 
         api.post_gattr({ [api.infokey] = info })
     end

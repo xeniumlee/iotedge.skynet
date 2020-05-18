@@ -14,6 +14,12 @@ gateway = {
     flowcontrol = 10,
     audit = true
 }
+gateway_ws = {
+    enabled = false
+}
+ws_proxy = {
+    enabled = false
+}
 gateway_mqtt = {
     tpl = 'gateway_mqtt_tb',
     id = 'MQTT_ID',
