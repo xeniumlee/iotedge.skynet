@@ -11,6 +11,7 @@ local applist = {}
 
 local audit = false
 local flowcontrol = false
+local rpctimeout = 6000 -- 1 min
 local req_num = 0
 local req_fmt = "[%s] from [%s] to [%s] total [%d]"
 
@@ -125,6 +126,24 @@ function command.unreg_dev(addr, name)
     end
 end
 
+local function timeout_call(addr, cmd, dev, arg)
+    local ok, ret, err, drop
+    local co = coroutine.running()
+    skynet.fork(function()
+        ok, ret, err = pcall(skynet.call, addr, "lua", cmd, dev, arg)
+        if not drop then
+            skynet.wakeup(co)
+        end
+    end)
+    skynet.sleep(rpctimeout)
+    if ok ~= nil then
+        return ok, ret, err
+    else
+        drop = true
+        return false, text.timeout
+    end
+end
+
 setmetatable(command, { __index = function(t, dev)
     local f
     if dev == "help" then
@@ -145,7 +164,7 @@ setmetatable(command, { __index = function(t, dev)
                 f = function(addr, cmd, arg)
                     if cmdlist[cmd] then
                         log_req(cmd, addr, dev)
-                        local ok, ret, err = pcall(skynet.call, d.addr, "lua", cmd, dev, arg)
+                        local ok, ret, err = timeout_call(d.addr, cmd, dev, arg)
                         if ok then
                             if err ~= nil then
                                 skynet.ret(skynet.pack(ret, err))

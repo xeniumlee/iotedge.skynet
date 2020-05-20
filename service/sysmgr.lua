@@ -336,7 +336,7 @@ local function launch_delay()
 end
 
 local function clean_delay()
-    skynet.sleep(1000)
+    skynet.sleep(3000)
 end
 
 local function upgrade_delay()

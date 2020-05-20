@@ -107,6 +107,8 @@ local function console_main_loop(fd)
                 else
                     dump(ok)
                 end
+            elseif cmdline ~= "" then
+                break
             end
         end
     end)

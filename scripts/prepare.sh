@@ -73,7 +73,7 @@ clean_svc rsync.service
 systemctl daemon-reload
 
 # Update
-apt-get update && apt-get -y upgrade && apt-get -y install telnet rlwrap
+apt-get update && apt-get -y upgrade && apt-get -y install telnet rlwrap arping
 
 # Restart
 reboot

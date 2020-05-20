@@ -66,6 +66,27 @@ namespace snap7 {
             info["pdurequested"] = TS7Client::PDURequested();
             info["pdulength"] = TS7Client::PDULength();
             info["plcstatus"] = plc_status(TS7Client::PlcStatus());
+
+            int value, ret;
+            ret = TS7Client::GetParam(3, &value);
+            if (ret == 0) {
+                info["pingtimeout"] = value;
+            }
+
+            ret = TS7Client::GetParam(4, &value);
+            if (ret == 0) {
+                info["sendtimeout"] = value;
+            }
+
+            ret = TS7Client::GetParam(5, &value);
+            if (ret == 0) {
+                info["recvtimeout"] = value;
+            }
+
+            ret = TS7Client::GetParam(6, &value);
+            if (ret == 0) {
+                info["workinterval"] = value;
+            }
             return info;
         }
     private:

@@ -126,7 +126,8 @@ local text = {
         cmd_registered = "new CMD registered",
         no_conf = "not configured",
         new_request = "new REQUEST",
-        busy = "busy"
+        busy = "busy",
+        timeout = "CMD execution timeout"
     },
     console = {
         prompt = ">> ",
