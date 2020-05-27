@@ -1,0 +1,18 @@
+[Unit]
+Description=VPN service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=WORKING_DIR
+ExecStart=/usr/sbin/openvpn \
+          --status ./logs/vpn-status.log \
+          --config ./run/vpn.conf \
+          --status-version 2 \
+          --suppress-timestamps
+RestartSec=5s
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

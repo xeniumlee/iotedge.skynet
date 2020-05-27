@@ -1,18 +1,16 @@
 [Unit]
-Description=VPN service
-After=network-online.target
-Wants=network-online.target
+Description=WireGuard via wg-quick(8)
+After=network-online.target nss-lookup.target
+Wants=network-online.target nss-lookup.target
 
 [Service]
-Type=notify
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=WORKING_DIR
-ExecStart=/usr/sbin/openvpn \
-          --status ./logs/vpn-status.log \
-          --config ./run/vpn.conf \
-          --status-version 2 \
-          --suppress-timestamps
-RestartSec=5s
-Restart=on-failure
+ExecStart=/usr/bin/wg-quick up ./run/wg0.conf
+ExecStop=/usr/bin/wg-quick down ./run/wg0.conf
+Environment=WG_ENDPOINT_RESOLUTION_RETRIES=infinity
+Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=WORKING_DIR/bin/prebuilt/wireguard-go
 
 [Install]
 WantedBy=multi-user.target

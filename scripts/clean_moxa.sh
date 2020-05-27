@@ -15,6 +15,7 @@ clean_svc cgmanager.service
 clean_svc cgproxy.service
 clean_svc rpcbind.service
 clean_svc rsync.service
+clean_svc lightdm.service
 systemctl daemon-reload
 
 if [ -f /usr/sbin/cell_mgmt ]; then

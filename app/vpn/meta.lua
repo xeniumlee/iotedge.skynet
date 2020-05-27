@@ -1,9 +1,7 @@
 conf = {
-    auto = true,
+    auto = false,
     eth = 'eth0',
-    proto = 'udp4',
-    ca = '',
-    cert = '',
-    key = '',
-    serverbridge = '',
+    address = '10.0.0.1/24',
+    listenport = 51820,
+    publickey = ''
 }

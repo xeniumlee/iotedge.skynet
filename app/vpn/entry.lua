@@ -1,24 +1,30 @@
 local skynet = require "skynet"
+local ini = require "utils.inifile"
 local validator = require "utils.validator"
 local text = require("text").app
 local log = require "log"
 local sys = require "sys"
 local api = require "api"
 
-local vpnconf = sys.run_root.."/vpn.conf"
-local install_cmd = sys.app_root.."/vpn/setup.sh"
-local route_cmd = "ip route"
-local interface_cmd = "ip addr"
 local svc = "vpn"
+local interface = "wg0"
+local show_cmd = "wg show "..interface
+local publickey = string.format("%s/public.key", sys.run_root)
+local privatekey = string.format("%s/private.key", sys.run_root)
+local genkey_cmd = string.format("wg genkey | tee %s | wg pubkey > %s", privatekey, publickey)
+local vpnini = string.format("%s/%s.conf", sys.run_root, interface)
 local info = { running = false }
+
+local vpnconf = {
+    Interface = {},
+    Peer = {}
+}
 
 local cfg_schema = {
     eth = validator.string,
-    proto = validator.vals("tcp4", "udp4"),
-    ca = validator.string,
-    cert = validator.string,
-    key = validator.string,
-    serverbridge = validator.string
+    address = validator.string,
+    listenport = validator.port,
+    publickey = validator.string
 }
 
 local cmd_desc = {
@@ -31,141 +37,95 @@ local function reg_cmd()
     end
 end
 
-local function install(start, eth)
-    local action = start and "start" or "stop"
-    local cmd = string.format("%s %s %s", install_cmd, action, eth)
-    return sys.exec_with_return(cmd)
+local function gen_subnet(addr)
+    local a, b, c, d, mask = addr:match("^(%d+).(%d+).(%d+).(%d+)/(%d+)$")
+    assert(a and b and c and d and mask, text.invalid_conf)
+    mask = tonumber(mask)
+    assert(mask > 0 and mask < 32, text.invalid_conf)
+    local max = 0xffffffff
+    local m = (max << (32 - mask)) & max
+    return string.format(
+        "%d.%d.%d.%d/%d",
+        (m >> 24) & tonumber(a),
+        (m >> 16) & tonumber(b),
+        (m >> 8) & tonumber(c),
+        m & tonumber(d),
+        mask
+        )
 end
 
-local function append_pem(k)
-    return function(pem)
-        return string.format("<%s>\n%s\n</%s>\n", k, pem, k)
-    end
+local function read_file(file)
+    local f = io.open(file)
+    local ret = f:read()
+    f:close()
+    assert(ret and ret ~= "", text.invalid_conf)
+    return ret
 end
 
-local function append_kv(k)
-    return function(v)
-        return string.format("%s %s\n", k, v)
-    end
+local function gen_postup(eth)
+    return string.format("iptables -t nat -A POSTROUTING -o %s -j MASQUERADE; sysctl -w net.ipv4.ip_forward=1", eth)
 end
 
-local conf_map = {
-    proto = append_kv("proto"),
-    serverbridge = append_kv("server-bridge"),
-    ca = append_pem("ca"),
-    cert = append_pem("cert"),
-    key = append_pem("key")
-}
+local function gen_postdown(eth)
+    return string.format("iptables -t nat -D POSTROUTING -o %s -j MASQUERADE; sysctl -w net.ipv4.ip_forward=0", eth)
+end
 
 local function gen_conf(cfg)
-    local file = io.open(vpnconf, "a")
-    local conf = ""
-    for k, v in pairs(cfg) do
-        local f = conf_map[k]
-        if f then
-            conf = conf..f(v)
-        end
-    end
-    file:write(conf)
-    file:close()
+    local i = vpnconf.Interface
+    i.Address = cfg.address
+    i.ListenPort = cfg.listenport
+    i.PrivateKey = read_file(privatekey)
+    i.PostUp = gen_postup(cfg.eth)
+    i.PostDown = gen_postdown(cfg.eth)
+
+    local p = vpnconf.Peer
+    p.AllowedIPs = gen_subnet(cfg.address)
+    p.PublicKey = cfg.publickey
+
+    ini.save(vpnini, vpnconf)
 end
 
-local function gen_server_bridge(cfg, ipaddr)
-    local ip, mask = ipaddr:match("^([.%d]+)/(%d+)$")
-    mask = math.tointeger(mask)
-    if ip and mask then
-        mask = (0xffffffff << (32-mask)) & 0xffffffff
-        mask = string.format(
-            "%d.%d.%d.%d",
-            (mask>>24)&0xff,
-            (mask>>16)&0xff,
-            (mask>>8)&0xff,
-            mask&0xff
-            )
-        cfg.serverbridge = string.format(
-            "%s %s %s",
-            ip,
-            mask,
-            cfg.serverbridge
-            )
-        return true
+local function gen_key()
+    local ok = pcall(read_file, privatekey)
+    if ok then
+        return ok
     else
-        return false
+        return sys.exec(genkey_cmd)
     end
 end
 
-local function gen_route()
-    local r = sys.exec_with_return(route_cmd)
-    local ret = {}
-    if r then
-        for s in r:gmatch("[^\n]+") do
-            table.insert(ret, s)
-        end
+local function start(cfg)
+    if not gen_key() then
+        return false, text.conf_fail
     end
-    return ret
-end
-
-local function gen_interface()
-    local i = sys.exec_with_return(interface_cmd)
-    local ret = {}
-    if i then
-        local key
-        for s in i:gmatch("[^\n]+") do
-            local eth, state = s:match("^%d+:%s+([^:]+):%s+(.+)$")
-            if eth and state then
-                key = eth
-                ret[eth] = {}
-                ret[eth].state = state
-            else
-                local ip = s:match("^%s+inet%s+(%g+)")
-                if ip then
-                    ret[key].addr = ip
-                end
-            end
-        end
+    local ok, key = pcall(read_file, publickey)
+    if ok then
+        info.publickey = key
     end
-    return ret
-end
 
-local function refresh_info(cfg)
-    info.running = cfg.auto
-    info.proto = cfg.proto
-    info.eth = cfg.eth
-    info.pool = cfg.serverbridge
-end
-
-local function init_conf(cfg)
-    local ipaddr = install(true, cfg.eth)
-    if ipaddr then
-        local ok = gen_server_bridge(cfg, ipaddr)
+    local err
+    ok, err = pcall(gen_conf, cfg)
+    if ok then
+        ok, err = sys.start_svc(svc)
         if ok then
-            ok = pcall(gen_conf, cfg)
+            info.running = cfg.auto
+            ok, err = sys.enable_svc(svc)
             if ok then
-                local err
-                ok, err = sys.start_svc(svc)
                 log.info(err)
-
-                if ok then
-                    _, err = sys.enable_svc(svc)
-                    log.info(err)
-                end
-                refresh_info(cfg)
-
-                return ok
             else
-                return false, text.conf_fail
+                log.error(err)
             end
         else
-            return false, text.invalid_conf
+            log.error(err)
         end
+
+        return ok
     else
-        return false, text.install_fail
+        return ok, err
     end
 end
 
 function vpn_info()
-    info.routes = gen_route()
-    info.interfaces = gen_interface()
     return info
 end
 
@@ -173,18 +133,26 @@ function on_conf(cfg)
     if cfg.auto then
         local ok = pcall(validator.check, cfg, cfg_schema)
         if ok then
-            return init_conf(cfg)
+            return start(cfg)
         else
-            return false, text.invalid_conf
+            return ok, text.invalid_conf
         end
     else
         local ok, err = sys.stop_svc(svc)
-        log.info(err)
+        if ok then
+            info.running = cfg.auto
+            log.info(err)
+        else
+            log.error(err)
+        end
 
-        _, err = sys.disable_svc(svc)
-        log.info(err)
+        ok, err = sys.disable_svc(svc)
+        if ok then
+            log.info(err)
+        else
+            log.error(err)
+        end
 
-        refresh_info(cfg)
         return ok
     end
 end

@@ -30,6 +30,14 @@ local sys = {
     gateway_global = "iotedge-gateway",
 }
 
+function sys.exec(cmd)
+    if type(cmd) == "string" then
+        return execute(cmd)
+    else
+        return false
+    end
+end
+
 function sys.exec_with_return(cmd)
     if type(cmd) == "string" then
         local f = io.popen(cmd)
