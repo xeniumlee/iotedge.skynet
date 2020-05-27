@@ -63,13 +63,8 @@ local function do_post_attr()
         end
         info.frp = api.external_request(api.frpappid, "list_proxy")
         local vpn = api.external_request(api.vpnappid, "vpn_info")
-        if type(vpn) == "table" and
-            vpn.interfaces and
-            vpn.interfaces.br0 then
-            local addr = vpn.interfaces.br0.addr
-            if addr then
-                info.host = addr:match("^([%d%.]+)")
-            end
+        if type(vpn) == "table" and vpn.host then
+            info.host = vpn.host
         end
 
         api.post_gattr({ [api.infokey] = info })

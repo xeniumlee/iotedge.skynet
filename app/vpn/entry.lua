@@ -13,7 +13,10 @@ local publickey = string.format("%s/public.key", sys.run_root)
 local privatekey = string.format("%s/private.key", sys.run_root)
 local genkey_cmd = string.format("wg genkey | tee %s | wg pubkey > %s", privatekey, publickey)
 local vpnini = string.format("%s/%s.conf", sys.run_root, interface)
-local info = { running = false }
+local info = {
+    proto = "udp",
+    running = false
+}
 
 local vpnconf = {
     Interface = {},
@@ -94,21 +97,33 @@ local function gen_key()
     end
 end
 
+local function init_info(cfg)
+    info.running = cfg.auto
+    if cfg.auto then
+        local ok, key = pcall(read_file, publickey)
+        if ok then
+            info.publickey = key
+        end
+        info.listenport = cfg.listenport
+        if type(cfg.address) == "string" then
+            local host = cfg.address:match("^([%d%.]+)/%d+$")
+            if host then
+                info.host = host
+            end
+        end
+    end
+end
+
 local function start(cfg)
     if not gen_key() then
         return false, text.conf_fail
     end
-    local ok, key = pcall(read_file, publickey)
-    if ok then
-        info.publickey = key
-    end
+    init_info(cfg)
 
-    local err
-    ok, err = pcall(gen_conf, cfg)
+    local ok, err = pcall(gen_conf, cfg)
     if ok then
         ok, err = sys.start_svc(svc)
         if ok then
-            info.running = cfg.auto
             ok, err = sys.enable_svc(svc)
             if ok then
                 log.info(err)
@@ -138,9 +153,9 @@ function on_conf(cfg)
             return ok, text.invalid_conf
         end
     else
+        init_info(cfg)
         local ok, err = sys.stop_svc(svc)
         if ok then
-            info.running = cfg.auto
             log.info(err)
         else
             log.error(err)

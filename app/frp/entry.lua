@@ -43,7 +43,6 @@ local proxylist = {
     },
     vpn = {
         name = "vpn",
-        local_port = sys.vpn_port
     }
 }
 
@@ -69,8 +68,8 @@ local vnc_schema = {
 }
 
 local vpn_type = {
-    tcp4 = "stcp",
-    udp4 = "sudp"
+    tcp = "stcp",
+    udp = "sudp"
 }
 local default_vpn_type = "sudp"
 
@@ -117,15 +116,28 @@ local function init_conf(cfg)
     frpcconf.common.server_port = cfg.server_port
     frpcconf.common.token = cfg.token
     frpcconf.common.protocol = cfg.protocol
-    ini.save(frpcini, frpcconf)
 
     local err
+    ok, err = pcall(ini.save, frpcini, frpcconf)
+    if not ok then
+        log.error(err)
+        return ok
+    end
+
     ok, err = sys.start_svc(svc)
-    log.info(err)
+    if ok then
+        log.info(err)
+    else
+        log.error(err)
+    end
 
     if ok then
-        _, err = sys.enable_svc(svc)
-        log.info(err)
+        ok, err = sys.enable_svc(svc)
+        if ok then
+            log.info(err)
+        else
+            log.error(err)
+        end
 
         running = true
     end
@@ -276,7 +288,7 @@ function open_vpn(token)
         local vpn = get_vpninfo()
         if vpn.running then
             frpcconf[token] = {
-                local_port = proxylist.vpn.local_port,
+                local_port = vpn.listenport,
                 name = proxylist.vpn.name,
                 local_ip = localhost,
                 type = vpn_type[vpn.proto] or default_vpn_type,
