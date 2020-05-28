@@ -429,11 +429,7 @@ local function unpack_conf(conf)
 end
 
 local function unpack_vpn(conf)
-    local c = unpack_conf(conf)
-    local crypt = require "skynet.crypt"
-    local basexx = require "utils.basexx"
-    c.key = crypt.desdecode("DES_2020", basexx.from_base64(c.key), 1)
-    return { [api.vpnappid] = c }
+    return { [api.vpnappid] = unpack_conf(conf) }
 end
 
 local function unpack_frp(conf)
