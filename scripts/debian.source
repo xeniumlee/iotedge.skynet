@@ -1,0 +1,5 @@
+deb http://debian.moxa.com/debian stretch main
+deb http://deb.debian.org/debian unstable main
+deb http://deb.debian.org/debian stretch main contrib
+deb http://deb.debian.org/debian stretch-updates main contrib
+deb http://deb.debian.org/debian stretch-backports main contrib
