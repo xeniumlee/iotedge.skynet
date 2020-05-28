@@ -13,7 +13,6 @@ local localhost = "127.0.0.1"
 
 local frpcconf = {
     common = {
-        tls_enable = true,
         log_file = "logs/frpc.log",
         pool_count = 2,
         admin_addr = "127.0.0.1",
