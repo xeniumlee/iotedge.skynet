@@ -342,15 +342,11 @@ local function decode_rpc(msg)
                 log.info(log_prefix, "decoded rpc",
                     request.device,
                     data.method,
-                    data.params.value)
+                    dump(data.params.value))
                 return  request.device, data.method, data.params.value, data.id
             else
-                -- table param
-                log.info(log_prefix, "decoded rpc",
-                    request.device,
-                    data.method,
-                    dump(data.params))
-                return  request.device, data.method, data.params, data.id
+                log.error(log_prefix, text.invalid_req)
+                return false
             end
         else
             log.error(log_prefix, text.invalid_req)
