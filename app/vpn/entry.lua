@@ -22,20 +22,9 @@ local vpnconf = {
 }
 
 local cfg_schema = {
+    eth = validator.string,
     address = validator.string,
     listenport = validator.port,
-    eth = function(v)
-        if type(v) == "table" then
-            for _, e in ipairs(v) do
-                if type(e) ~= "string" or e == "" then
-                    return false
-                end
-            end
-            return true
-        else
-            return false
-        end
-    end
 }
 
 local cmd_desc = {
@@ -52,7 +41,7 @@ end
 
 local function gen_postup(eth)
     local cmd = { "sysctl -w net.ipv4.ip_forward=1" }
-    for _, e in ipairs(eth) do
+    for e in string.gmatch(eth, "%g+") do
         table.insert(cmd, string.format("iptables -t nat -A POSTROUTING -o %s -j MASQUERADE", e))
     end
     return table.concat(cmd, ";")
@@ -60,7 +49,7 @@ end
 
 local function gen_postdown(eth)
     local cmd = {}
-    for _, e in ipairs(eth) do
+    for e in string.gmatch(eth, "%g+") do
         table.insert(cmd, string.format("iptables -t nat -D POSTROUTING -o %s -j MASQUERADE", e))
     end
     return table.concat(cmd, ";")
