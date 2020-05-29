@@ -8,29 +8,39 @@ local api = require "api"
 
 local svc = "vpn"
 local interface = "wg0"
-local show_cmd = "wg show "..interface
 local publickey = string.format("%s/public.key", sys.run_root)
 local privatekey = string.format("%s/private.key", sys.run_root)
+local show_cmd = string.format("wg show %s", interface)
 local genkey_cmd = string.format("wg genkey | tee %s | wg pubkey > %s", privatekey, publickey)
+local open_cmd = string.format("wg set %s peer %%s allowed-ips %%s/32", interface)
+local close_cmd = string.format("wg set %s peer %%s remove", interface)
 local vpnini = string.format("%s/%s.conf", sys.run_root, interface)
-local info = {
-    proto = "udp",
-    running = false
-}
+local info = {}
 
 local vpnconf = {
-    Interface = {},
-    Peer = {}
+    Interface = {}
 }
 
 local cfg_schema = {
-    eth = validator.string,
     address = validator.string,
     listenport = validator.port,
-    publickey = validator.string
+    eth = function(v)
+        if type(v) == "table" then
+            for _, e in ipairs(v) do
+                if type(e) ~= "string" or e == "" then
+                    return false
+                end
+            end
+            return true
+        else
+            return false
+        end
+    end
 }
 
 local cmd_desc = {
+    open_peer = "{ publickey=<>, ip=<x.x.x.x> }",
+    close_peer = "{ publickey=<> }",
     vpn_info = "Show VPN configuration & status",
 }
 
@@ -40,21 +50,20 @@ local function reg_cmd()
     end
 end
 
-local function gen_subnet(addr)
-    local a, b, c, d, mask = addr:match("^(%d+).(%d+).(%d+).(%d+)/(%d+)$")
-    assert(a and b and c and d and mask, text.invalid_conf)
-    mask = tonumber(mask)
-    assert(mask > 0 and mask < 32, text.invalid_conf)
-    local max = 0xffffffff
-    local m = (max << (32 - mask)) & max
-    return string.format(
-        "%d.%d.%d.%d/%d",
-        (m >> 24) & tonumber(a),
-        (m >> 16) & tonumber(b),
-        (m >> 8) & tonumber(c),
-        m & tonumber(d),
-        mask
-        )
+local function gen_postup(eth)
+    local cmd = { "sysctl -w net.ipv4.ip_forward=1" }
+    for _, e in ipairs(eth) do
+        table.insert(cmd, string.format("iptables -t nat -A POSTROUTING -o %s -j MASQUERADE", e))
+    end
+    return table.concat(cmd, ";")
+end
+
+local function gen_postdown(eth)
+    local cmd = {}
+    for _, e in ipairs(eth) do
+        table.insert(cmd, string.format("iptables -t nat -D POSTROUTING -o %s -j MASQUERADE", e))
+    end
+    return table.concat(cmd, ";")
 end
 
 local function read_file(file)
@@ -65,12 +74,14 @@ local function read_file(file)
     return ret
 end
 
-local function gen_postup(eth)
-    return string.format("iptables -t nat -A POSTROUTING -o %s -j MASQUERADE; sysctl -w net.ipv4.ip_forward=1", eth)
-end
-
-local function gen_postdown(eth)
-    return string.format("iptables -t nat -D POSTROUTING -o %s -j MASQUERADE; sysctl -w net.ipv4.ip_forward=0", eth)
+local function gen_key()
+    local private = pcall(read_file, privatekey)
+    local public = pcall(read_file, publickey)
+    if private and public then
+        return true
+    else
+        return sys.exec(genkey_cmd)
+    end
 end
 
 local function gen_conf(cfg)
@@ -80,31 +91,22 @@ local function gen_conf(cfg)
     i.PrivateKey = read_file(privatekey)
     i.PostUp = gen_postup(cfg.eth)
     i.PostDown = gen_postdown(cfg.eth)
-
-    local p = vpnconf.Peer
-    p.AllowedIPs = gen_subnet(cfg.address)
-    p.PublicKey = cfg.publickey
+    i.SaveConfig = "true"
 
     ini.save(vpnini, vpnconf)
 end
 
-local function gen_key()
-    local ok = pcall(read_file, privatekey)
-    if ok then
-        return ok
-    else
-        return sys.exec(genkey_cmd)
-    end
-end
-
 local function init_info(cfg)
+    info = {}
     info.running = cfg.auto
     if cfg.auto then
+        info.listenport = cfg.listenport
+
         local ok, key = pcall(read_file, publickey)
         if ok then
             info.publickey = key
         end
-        info.listenport = cfg.listenport
+
         if type(cfg.address) == "string" then
             local host = cfg.address:match("^([%d%.]+)/%d+$")
             if host then
@@ -140,7 +142,37 @@ local function start(cfg)
     end
 end
 
+function open_peer(arg)
+    if type(arg) == "table" and
+        type(arg.publickey) == "string" and
+        type(arg.ip) == "string" and arg.ip:match("^[%d%.]+$") then
+        local cmd = string.format(open_cmd, arg.publickey, arg.ip)
+        return sys.exec(cmd)
+    else
+        return false, text.invalid_arg
+    end
+end
+
+function close_peer(arg)
+    if type(arg) == "table" and
+        type(arg.publickey) == "string" then
+        local cmd = string.format(close_cmd, arg.publickey)
+        return sys.exec(cmd)
+    else
+        return false, text.invalid_arg
+    end
+end
+
 function vpn_info()
+    if info.running then
+        local peers = sys.exec_with_return(show_cmd)
+        if peers then
+            info.peers = {}
+            for p in string.gmatch(peers, "allowed ips:%s+([%d%.]+)") do
+                table.insert(info.peers, p)
+            end
+        end
+    end
     return info
 end
 
@@ -167,6 +199,8 @@ function on_conf(cfg)
         else
             log.error(err)
         end
+
+        os.remove(vpnini)
 
         return ok
     end

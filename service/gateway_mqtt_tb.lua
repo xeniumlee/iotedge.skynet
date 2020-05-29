@@ -534,6 +534,8 @@ local req_map = {
     open_vpn = api.frpappid,
     close_vpn = api.frpappid,
     vpn_info = api.vpnappid,
+    open_peer = api.vpnappid,
+    close_peer = api.vpnappid,
     upgrade = api.sysappid
 }
 
@@ -567,15 +569,11 @@ local function decode_req(msg)
             log.info(log_prefix, "decoded req",
                 dev,
                 request.method,
-                request.params.value)
+                dump(request.params.value))
             return dev, request.method, request.params.value, session
         else
-            -- table param
-            log.info(log_prefix, "decoded req",
-                dev,
-                request.method,
-                dump(request.params))
-            return dev, request.method, request.params, session
+            log.error(log_prefix, text.invalid_req)
+            return false
         end
     else
         log.error(log_prefix, text.invalid_req)

@@ -1,7 +1,6 @@
 conf = {
     auto = false,
-    eth = 'eth0',
+    eth = { 'eth0', 'eth1' },
     address = '10.255.255.1/24',
-    listenport = 61820,
-    publickey = ''
+    listenport = 61820
 }
