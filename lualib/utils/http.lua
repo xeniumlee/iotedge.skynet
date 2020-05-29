@@ -25,17 +25,15 @@ function http.get(uri, auth, timeout)
                 end
             end
 
-            local ok, code, body = pcall(httpc.get, host, uri, nil, header)
             if timeout then
                 httpc.timeout = timeout
             else
                 httpc.timeout = t
             end
+            local ok, code, body = pcall(httpc.get, host, uri, nil, header)
             if ok and code == 200 and body then
-                httpc.timeout = t
                 return body
             else
-                httpc.timeout = t
                 return false
             end
         else
