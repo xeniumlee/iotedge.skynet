@@ -48,6 +48,17 @@ local text = {
         invalid_write = "invalid write",
         exception = "exception raised",
     },
+    vpn = {
+        invalid_arg = "invalid argument",
+        invalid_conf = "invalid configuration",
+        conf_fail = "configure failed",
+        vpn_stopped = "VPN server stopped",
+        peer_expired = "PEER expired",
+        peer_dup = "Duplicated peer ip address",
+        peer_update = "Peer ip address will be replaced",
+        peer_opened = "Peer already opened",
+        peer_closed = "Peer already closed"
+    },
     s7 = {
         invalid_area_conf = "invalid area configuration",
         invalid_dbnumber_conf = "invalid dbnumber configuration",
