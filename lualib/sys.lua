@@ -44,8 +44,10 @@ function sys.exec_with_return(cmd)
         if f then
             local s = f:read("a")
             if s ~= "" then
+                f:close()
                 return s
             else
+                f:close()
                 return false
             end
         else
