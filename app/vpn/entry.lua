@@ -253,6 +253,9 @@ function close_peer(arg)
     if info.running then
         if type(arg) == "table" and
             type(arg.publickey) == "string" then
+
+            refresh_peer()
+
             if peers[arg.publickey] then
                 return do_close_peer(arg.publickey)
             else
