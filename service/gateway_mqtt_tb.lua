@@ -469,7 +469,7 @@ local conf_map = {
         end
         return c
     end,
-    vpn = unpack_vpn,
+    wg = unpack_vpn,
     frp = unpack_frp,
     repo = unpack_repo
 }

@@ -148,6 +148,7 @@ local function init_info(cfg)
     info = {}
     info.running = cfg.enabled
     if info.running then
+        info.proto = "udp"
         info.listenport = cfg.listenport
         info.max_session = cfg.max_session
 

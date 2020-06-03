@@ -64,7 +64,7 @@ local function do_post_attr()
         info.frp = api.external_request(api.frpappid, "list_proxy")
         local vpn = api.external_request(api.vpnappid, "vpn_info")
         if type(vpn) == "table" and vpn.host then
-            info.vpn = vpn
+            info.wg = vpn
         end
 
         api.post_gattr({ [api.infokey] = info })
