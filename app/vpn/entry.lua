@@ -31,6 +31,7 @@ local open_cmd = string.format("wg set %s peer %%s allowed-ips %%s/%d", interfac
 local close_cmd = string.format("wg set %s peer %%s remove", interface)
 
 local info = {}
+local peers = {}
 
 local vpnconf = {
     Interface = {}
@@ -40,6 +41,7 @@ local cfg_schema = {
     eth = validator.string,
     address = validator.string,
     listenport = validator.port,
+    max_session = validator.posint
 }
 
 local cmd_desc = {
@@ -100,23 +102,69 @@ local function gen_conf(cfg)
     ini.save(vpnini, vpnconf)
 end
 
+local function do_close_peer(key)
+    peers[key] = nil
+    local cmd = string.format(close_cmd, key)
+    return sys.exec(cmd)
+end
+
+local function refresh_peer()
+    local now = math.floor(skynet.time())
+
+    local list = sys.exec_with_return(peer_ip_cmd)
+    if list then
+        for key, ip in string.gmatch(list, peer_ip) do
+            local peer = peers[key]
+            if peer then
+                peer.ip = ip
+            else
+                peers[key] = { ip = ip, last = now }
+            end
+        end
+    end
+
+    list = sys.exec_with_return(peer_handshake_cmd)
+    if list then
+        for key, last in string.gmatch(list, peer_handshake) do
+            local peer = peers[key]
+            if peer then
+                local t = math.tointeger(last)
+                if t ~= 0 then
+                    peer.last = t
+                end
+            end
+        end
+    end
+
+    for key, peer in pairs(peers) do
+        if now - peer.last > info.max_session then
+            do_close_peer(key)
+            log.info(text.peer_expired, key)
+        end
+    end
+end
+
 local function init_info(cfg)
-    info = { peers = {} }
-    info.running = cfg.auto
-    if cfg.auto then
+    info = {}
+    info.running = cfg.enabled
+    if info.running then
         info.listenport = cfg.listenport
+        info.max_session = cfg.max_session
 
         local ok, key = pcall(read_file, publickey)
         if ok then
             info.publickey = key
         end
 
-        if type(cfg.address) == "string" then
-            local host = cfg.address:match(interface_address)
-            if host then
-                info.host = host
-            end
+        local host = cfg.address:match(interface_address)
+        if host then
+            info.host = host
         end
+
+        refresh_peer()
+        info.peers = peers
+    else
+        info.peers = {}
     end
 end
 
@@ -132,7 +180,6 @@ local function start(cfg)
         if ok then
             ok, err = sys.enable_svc(svc)
             if ok then
-                max_session = cfg.max_session
                 log.info(err)
             else
                 log.error(err)
@@ -147,10 +194,26 @@ local function start(cfg)
     end
 end
 
-local function do_close_peer(key)
-    info.peers[key] = nil
-    local cmd = string.format(close_cmd, key)
-    return sys.exec(cmd)
+local function stop(cfg)
+    init_info(cfg)
+
+    local ok, err = sys.stop_svc(svc)
+    if ok then
+        log.info(err)
+    else
+        log.error(err)
+    end
+
+    ok, err = sys.disable_svc(svc)
+    if ok then
+        log.info(err)
+    else
+        log.error(err)
+    end
+
+    os.remove(vpnini)
+
+    return ok
 end
 
 function open_peer(arg)
@@ -159,12 +222,15 @@ function open_peer(arg)
             type(arg.publickey) == "string" and
             type(arg.ip) == "string" and arg.ip:match(peer_address) then
 
-            for p in pairs(info.peers) do
-                if p.ip == arg.ip then
+            refresh_peer()
+
+            for k, p in pairs(peers) do
+                if k ~= arg.publickey and p.ip == arg.ip then
                     return false, text.peer_dup
                 end
             end
-            local peer =  info.peers[arg.publickey]
+
+            local peer = peers[arg.publickey]
             if peer then
                 if peer.ip == arg.ip then
                     return true, text.peer_opened
@@ -186,8 +252,7 @@ function close_peer(arg)
     if info.running then
         if type(arg) == "table" and
             type(arg.publickey) == "string" then
-            local peer =  info.peers[arg.publickey]
-            if peer then
+            if peers[arg.publickey] then
                 return do_close_peer(arg.publickey)
             else
                 return true, text.peer_closed
@@ -202,62 +267,23 @@ end
 
 function vpn_info()
     if info.running then
-        local now = math.floor(skynet.time())
-        local peers = sys.exec_with_return(peer_ip_cmd)
-        if peers then
-            for key, ip in string.gmatch(peers, peer_ip) do
-                if not info.peers[key] then
-                    info.peers[key] = { ip = ip, last = now }
-                end
-
-                local h = sys.exec_with_return(peer_handshake_cmd)
-                if h then
-                    for k, time in string.gmatch(h, peer_handshake) do
-                        if info.peers[k] then
-                            local t = math.tointeger(time)
-                            if t ~= 0 then
-                                info.peers[k].last = t
-                            end
-                            if now - info.peers[k].last > max_session then
-                                do_close_peer(k)
-                                log.info(text.peer_expired, k)
-                            end
-                        end
-                    end
-                end
-            end
-        end
+        refresh_peer()
     end
     return info
 end
 
 function on_conf(cfg)
-    if cfg.auto then
+    if cfg.enabled == true then
         local ok = pcall(validator.check, cfg, cfg_schema)
         if ok then
             return start(cfg)
         else
             return ok, text.invalid_conf
         end
+    elseif cfg.enabled == false then
+        return stop(cfg)
     else
-        init_info(cfg)
-        local ok, err = sys.stop_svc(svc)
-        if ok then
-            log.info(err)
-        else
-            log.error(err)
-        end
-
-        ok, err = sys.disable_svc(svc)
-        if ok then
-            log.info(err)
-        else
-            log.error(err)
-        end
-
-        os.remove(vpnini)
-
-        return ok
+        return false, text.invalid_conf
     end
 end
 
