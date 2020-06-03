@@ -503,6 +503,12 @@ local function load_all()
     load_sysapp()
 
     local total = api.internal_request("conf_get", "total")
+
+    -- enabled by default
+    if not total.apps[vpnappid] then
+        total.apps[vpnappid] = { [vpnappid] = clone(tpllist[vpnappid], {}) }
+    end
+
     local ok, err = pcall(validate_full_conf, total)
     if ok then
         configure_all(total, true)
