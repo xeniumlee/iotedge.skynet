@@ -13,9 +13,6 @@ local text = {
         pack_fail = "pack failed",
         invalid_arg = "invalid argument",
         invalid_conf = "invalid configuration",
-        conf_fail = "configure failed",
-        install_fail = "install failed",
-        vpn_stopped = "VPN server stopped",
         app_stopped = "APP not running"
     },
     store = {
@@ -52,6 +49,7 @@ local text = {
         invalid_arg = "invalid argument",
         invalid_conf = "invalid configuration",
         conf_fail = "configure failed",
+        install_fail = "install failed",
         vpn_stopped = "VPN server stopped",
         peer_expired = "PEER expired",
         peer_dup = "Duplicated peer ip address",

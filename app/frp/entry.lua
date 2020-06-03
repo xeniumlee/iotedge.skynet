@@ -283,7 +283,7 @@ function open_vpn(token)
     if not running then
         return false, text.app_stopped
     end
-    if type(token) == "string" and not frpcconf[token] then
+    if type(token) == "string" then
         local vpn = get_vpninfo()
         if vpn.running then
             frpcconf[token] = {
@@ -295,7 +295,7 @@ function open_vpn(token)
             }
             return reload()
         else
-            return false, text.vpn_stopped
+            return false, text.app_stopped
         end
     else
         return false, text.invalid_arg

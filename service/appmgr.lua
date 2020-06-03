@@ -47,12 +47,8 @@ end
 
 local function make_appinfo(app)
     local info = {}
-    if app.conf then
-        if app.name == vpnappid then
-            info.running = app.conf.auto
-        elseif app.name ~= hostappid then
-            info.conf = app.conf
-        end
+    if app.conf and app.name ~= hostappid then
+        info.conf = app.conf
     end
     info.load_time = app.load_time
     return info

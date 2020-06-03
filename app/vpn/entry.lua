@@ -1,6 +1,7 @@
 local skynet = require "skynet"
 local ini = require "utils.inifile"
 local validator = require "utils.validator"
+local basexx = require "utils.basexx"
 local text = require("text").vpn
 local log = require "log"
 local sys = require "sys"
@@ -145,9 +146,8 @@ local function refresh_peer()
 end
 
 local function init_info(cfg)
-    info = {}
-    info.running = cfg.enabled
-    if info.running then
+    info = { running = false }
+    if cfg.enabled then
         info.proto = "udp"
         info.listenport = cfg.listenport
         info.max_session = cfg.max_session
@@ -155,6 +155,7 @@ local function init_info(cfg)
         local ok, key = pcall(read_file, publickey)
         if ok then
             info.publickey = key
+            info.token = basexx.to_hex(key)
         end
 
         local host = cfg.address:match(interface_address)
@@ -162,10 +163,25 @@ local function init_info(cfg)
             info.host = host
         end
 
-        refresh_peer()
         info.peers = peers
-    else
-        info.peers = {}
+    end
+end
+
+local function open_frp()
+    if info.token then
+        local ok, err = api.external_request(api.frpappid, "open_vpn", info.token)
+        if not ok then
+            log.error(err)
+        end
+    end
+end
+
+local function close_frp()
+    if info.token then
+        local ok, err = api.external_request(api.frpappid, "close_vpn", info.token)
+        if not ok then
+            log.error(err)
+        end
     end
 end
 
@@ -179,6 +195,10 @@ local function start(cfg)
     if ok then
         ok, err = sys.start_svc(svc)
         if ok then
+            refresh_peer()
+            info.running = true
+
+            skynet.timeout(500, open_frp)
             ok, err = sys.enable_svc(svc)
             if ok then
                 log.info(err)
@@ -196,6 +216,8 @@ local function start(cfg)
 end
 
 local function stop(cfg)
+    close_frp()
+    peers = {}
     init_info(cfg)
 
     local ok, err = sys.stop_svc(svc)
