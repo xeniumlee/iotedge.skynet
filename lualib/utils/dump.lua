@@ -21,24 +21,29 @@ local function print_v(value)
     end
 end
 
-return function(tbl)
-    local lines = {}
-    local function dump_table(t, indent)
-        local prefix = srep(' ', indent*4)
-        for k, v in pairs(t) do
-            if type(v) == "table" then
-                tinsert(lines, prefix..print_k(k)..'{')
-                dump_table(v, indent+1)
-                if indent == 0 then
-                    tinsert(lines, prefix..'}')
-                else
-                    tinsert(lines, prefix..'},')
-                end
+local function dump_table(t, indent, lines)
+    local prefix = srep(' ', indent*4)
+    for k, v in pairs(t) do
+        if type(v) == "table" then
+            tinsert(lines, prefix..print_k(k)..'{')
+            dump_table(v, indent+1, lines)
+            if indent == 0 then
+                tinsert(lines, prefix..'}')
             else
-                tinsert(lines, prefix..print_k(k)..print_v(v)..',')
+                tinsert(lines, prefix..'},')
             end
+        else
+            tinsert(lines, prefix..print_k(k)..print_v(v)..',')
         end
     end
-    dump_table(tbl, 0)
-    return table.concat(lines, '\n')
+end
+
+return function(tbl)
+    if type(tbl) == "table" then
+        local lines = {}
+        dump_table(tbl, 0, lines)
+        return table.concat(lines, '\n')
+    else
+        return tostring(tbl)
+    end
 end

@@ -10,7 +10,7 @@ local api = require "api"
 local svc = "vpn"
 local interface = "wg0"
 local ip_suffix = 32
-local max_session = 60*60
+local max_idle = 60*60
 
 local interface_address = "^([%d%.]+)/%d+$"
 local peer_address = "^[%d%.]+$"
@@ -42,7 +42,7 @@ local cfg_schema = {
     eth = validator.string,
     address = validator.string,
     listenport = validator.port,
-    max_session = validator.posint
+    max_idle = validator.posint
 }
 
 local cmd_desc = {
@@ -138,7 +138,7 @@ local function refresh_peer()
     end
 
     for key, peer in pairs(peers) do
-        if now - peer.last > info.max_session then
+        if now - peer.last > info.max_idle then
             do_close_peer(key)
             log.info(text.peer_expired, key)
         end
@@ -150,7 +150,7 @@ local function init_info(cfg)
     if cfg.enabled then
         info.proto = "udp"
         info.listenport = cfg.listenport
-        info.max_session = cfg.max_session
+        info.max_idle = cfg.max_idle
 
         local ok, key = pcall(read_file, publickey)
         if ok then
