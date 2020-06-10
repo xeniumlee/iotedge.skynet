@@ -9,17 +9,44 @@
 #include "sol2.hpp"
 #endif
 
+#define RETURN_VALUE(T, V) { \
+	sol::variadic_results ret; \
+    ret.push_back({ L, sol::in_place_type<bool>, true }); \
+	ret.push_back({ L, sol::in_place_type<T>, *(T*)V.data }); \
+    UA_Variant_clear(&V); \
+	return ret; \
+}
+
+#define RETURN_STRING(V) { \
+    UA_String* str = (UA_String*)V.data; \
+	sol::variadic_results ret; \
+    ret.push_back({ L, sol::in_place_type<bool>, true }); \
+	ret.push_back({ L, sol::in_place_type<std::string>, std::string(reinterpret_cast<const char*>(str->data), str->length) }); \
+    UA_Variant_clear(&V); \
+	return ret; \
+}
+
+#define RETURN_ERROR(E, V) { \
+    UA_Variant_clear(&V); \
+	sol::variadic_results ret; \
+    ret.push_back({ L, sol::in_place_type<bool>, false }); \
+	ret.push_back({ L, sol::in_place_type<std::string>, E }); \
+	return ret; \
+}
+
 namespace opcua {
+    std::string err_not_supported = "Not supported data type";
+
     class Client {
     private:
         UA_Client* _client;
-        UA_UInt16 _ns;
-        UA_String _ns_name;
+        UA_Int16 _ns = -1;
 
     private:
-        auto setNamespaceIndex() {
+        auto setNamespaceIndex(const std::string& Namespace) {
             UA_UInt16 idx;
-            UA_StatusCode ret = UA_Client_NamespaceGetIndex(_client, &_ns_name, &idx);
+            UA_String ns = UA_STRING(const_cast<char*>(Namespace.data()));
+            UA_StatusCode ret = UA_Client_NamespaceGetIndex(_client, &ns, &idx);
             if (ret == UA_STATUSCODE_GOOD) {
                 _ns = idx;
             }
@@ -27,8 +54,7 @@ namespace opcua {
         }
 
     public:
-        Client(const std::string& Namespace) {
-            _ns_name = UA_STRING_ALLOC(Namespace.data());
+        Client() {
             _client = UA_Client_new();
             UA_ClientConfig_setDefault(UA_Client_getConfig(_client));
         }
@@ -38,11 +64,11 @@ namespace opcua {
             UA_Client_delete(_client);
         }
 
-        auto Connect(const std::string& EndpointUrl) {
+        auto Connect(const std::string& EndpointUrl, const std::string& Namespace) {
             UA_StatusCode ret = UA_Client_connect(_client, EndpointUrl.data());
             bool ok = (ret == UA_STATUSCODE_GOOD);
             if (ok) {
-                ret = setNamespaceIndex();
+                ret = setNamespaceIndex(Namespace);
                 ok = (ret == UA_STATUSCODE_GOOD);
                 if (!ok) {
                     UA_Client_disconnect(_client);
@@ -53,11 +79,12 @@ namespace opcua {
             }
         }
 
-        auto ConnectUsername(const std::string& EndpointUrl, const std::string& Username, const std::string& Password) {
+        auto ConnectUsername(const std::string& EndpointUrl, const std::string& Namespace,
+                const std::string& Username, const std::string& Password) {
             UA_StatusCode ret =  UA_Client_connect_username(_client, EndpointUrl.data(), Username.data(), Password.data());
             bool ok = (ret == UA_STATUSCODE_GOOD);
             if (ok) {
-                ret = setNamespaceIndex();
+                ret = setNamespaceIndex(Namespace);
                 ok = (ret == UA_STATUSCODE_GOOD);
                 if (!ok) {
                     UA_Client_disconnect(_client);
@@ -71,6 +98,50 @@ namespace opcua {
         auto Disconnect() {
             UA_StatusCode ret = UA_Client_disconnect(_client);
             return std::make_tuple(ret == UA_STATUSCODE_GOOD, std::string(UA_StatusCode_name(ret)));
+        }
+
+        auto Read(int NodeId, sol::this_state L) {
+            UA_Variant value;
+            UA_Variant_init(&value);
+            const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
+            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &value);
+
+            if (code == UA_STATUSCODE_GOOD) {
+                if (UA_Variant_isScalar(&value)) {
+                    switch(value.type->typeIndex) {
+                        case UA_TYPES_BOOLEAN:
+                            RETURN_VALUE(UA_Boolean, value)
+                        case UA_TYPES_SBYTE:
+                            RETURN_VALUE(UA_SByte, value);
+                        case UA_TYPES_BYTE:
+                            RETURN_VALUE(UA_Byte, value);
+                        case UA_TYPES_INT16:
+                            RETURN_VALUE(UA_Int16, value);
+                        case UA_TYPES_UINT16:
+                            RETURN_VALUE(UA_UInt16, value);
+                        case UA_TYPES_INT32:
+                            RETURN_VALUE(UA_Int32, value);
+                        case UA_TYPES_UINT32:
+                            RETURN_VALUE(UA_UInt32, value);
+                        case UA_TYPES_INT64:
+                            RETURN_VALUE(UA_Int64, value);
+                        case UA_TYPES_UINT64:
+                            RETURN_VALUE(UA_UInt64, value);
+                        case UA_TYPES_FLOAT:
+                            RETURN_VALUE(UA_Float, value);
+                        case UA_TYPES_DOUBLE:
+                            RETURN_VALUE(UA_Double, value);
+                        case UA_TYPES_STRING:
+                            RETURN_STRING(value);
+                        default:
+                            RETURN_ERROR(err_not_supported, value);
+                    }
+                } else {
+                    RETURN_ERROR(err_not_supported, value);
+                }
+            } else {
+                RETURN_ERROR(std::string(UA_StatusCode_name(code)), value);
+            }
         }
 
         auto Register(const std::string& NodeId, sol::this_state L) {
@@ -99,6 +170,7 @@ namespace opcua {
 
             return ret;
         }
+
         auto UnRegister(int NodeId, sol::this_state L) {
             UA_UnregisterNodesRequest req;
             UA_UnregisterNodesRequest_init(&req);
@@ -131,6 +203,7 @@ namespace opcua {
 
         module.new_usertype<Client>("client",
             "connect", sol::overload(&Client::Connect, &Client::ConnectUsername),
+            "disconnect", &Client::Disconnect,
             "register", &Client::Register,
             "unregister", &Client::UnRegister
         );
