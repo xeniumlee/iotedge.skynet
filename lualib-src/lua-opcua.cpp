@@ -9,33 +9,32 @@
 #include "sol2.hpp"
 #endif
 
-#define RETURN_VALUE(T, V) { \
-	sol::variadic_results ret; \
-    ret.push_back({ L, sol::in_place_type<bool>, true }); \
-	ret.push_back({ L, sol::in_place_type<T>, *(T*)V.data }); \
-    UA_Variant_clear(&V); \
-	return ret; \
+#define RETURN_OK(R) R.push_back({ L, sol::in_place_type<bool>, true });
+
+#define RETURN_VARIANT(R, T, V) { \
+    RETURN_OK(R) \
+	R.push_back({ L, sol::in_place_type<T>, *(T*)V.data }); \
 }
 
-#define RETURN_STRING(V) { \
+#define RETURN_STRING(R, V) { \
     UA_String* str = (UA_String*)V.data; \
-	sol::variadic_results ret; \
-    ret.push_back({ L, sol::in_place_type<bool>, true }); \
-	ret.push_back({ L, sol::in_place_type<std::string>, std::string(reinterpret_cast<const char*>(str->data), str->length) }); \
-    UA_Variant_clear(&V); \
-	return ret; \
+    RETURN_OK(R) \
+	R.push_back({ L, sol::in_place_type<std::string>, std::string(reinterpret_cast<const char*>(str->data), str->length) }); \
 }
 
-#define RETURN_ERROR(E, V) { \
-    UA_Variant_clear(&V); \
-	sol::variadic_results ret; \
-    ret.push_back({ L, sol::in_place_type<bool>, false }); \
-	ret.push_back({ L, sol::in_place_type<std::string>, E }); \
-	return ret; \
+#define RETURN_VALUE(R, T, V) { \
+    RETURN_OK(R) \
+	R.push_back({ L, sol::in_place_type<T>, V }); \
+}
+
+#define RETURN_ERROR(R, E) { \
+    R.push_back({ L, sol::in_place_type<bool>, false }); \
+	R.push_back({ L, sol::in_place_type<std::string>, E }); \
 }
 
 namespace opcua {
     std::string err_not_supported = "Not supported data type";
+    std::string err_register_failed = "Register node failed";
 
     class Client {
     private:
@@ -106,42 +105,58 @@ namespace opcua {
             const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
             UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &value);
 
+            sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
                 if (UA_Variant_isScalar(&value)) {
                     switch(value.type->typeIndex) {
                         case UA_TYPES_BOOLEAN:
-                            RETURN_VALUE(UA_Boolean, value)
+                            RETURN_VARIANT(ret, UA_Boolean, value)
+                            break;
                         case UA_TYPES_SBYTE:
-                            RETURN_VALUE(UA_SByte, value);
+                            RETURN_VARIANT(ret, UA_SByte, value)
+                            break;
                         case UA_TYPES_BYTE:
-                            RETURN_VALUE(UA_Byte, value);
+                            RETURN_VARIANT(ret, UA_Byte, value)
+                            break;
                         case UA_TYPES_INT16:
-                            RETURN_VALUE(UA_Int16, value);
+                            RETURN_VARIANT(ret, UA_Int16, value)
+                            break;
                         case UA_TYPES_UINT16:
-                            RETURN_VALUE(UA_UInt16, value);
+                            RETURN_VARIANT(ret, UA_UInt16, value)
+                            break;
                         case UA_TYPES_INT32:
-                            RETURN_VALUE(UA_Int32, value);
+                            RETURN_VARIANT(ret, UA_Int32, value)
+                            break;
                         case UA_TYPES_UINT32:
-                            RETURN_VALUE(UA_UInt32, value);
+                            RETURN_VARIANT(ret, UA_UInt32, value)
+                            break;
                         case UA_TYPES_INT64:
-                            RETURN_VALUE(UA_Int64, value);
+                            RETURN_VARIANT(ret, UA_Int64, value)
+                            break;
                         case UA_TYPES_UINT64:
-                            RETURN_VALUE(UA_UInt64, value);
+                            RETURN_VARIANT(ret, UA_UInt64, value)
+                            break;
                         case UA_TYPES_FLOAT:
-                            RETURN_VALUE(UA_Float, value);
+                            RETURN_VARIANT(ret, UA_Float, value)
+                            break;
                         case UA_TYPES_DOUBLE:
-                            RETURN_VALUE(UA_Double, value);
+                            RETURN_VARIANT(ret, UA_Double, value)
+                            break;
                         case UA_TYPES_STRING:
-                            RETURN_STRING(value);
+                            RETURN_STRING(ret, value)
+                            break;
                         default:
-                            RETURN_ERROR(err_not_supported, value);
+                            RETURN_ERROR(ret, err_not_supported)
                     }
                 } else {
-                    RETURN_ERROR(err_not_supported, value);
+                    RETURN_ERROR(ret, err_not_supported)
                 }
             } else {
-                RETURN_ERROR(std::string(UA_StatusCode_name(code)), value);
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
+
+            UA_Variant_clear(&value);
+            return ret;
         }
 
         auto Register(const std::string& NodeId, sol::this_state L) {
@@ -156,18 +171,19 @@ namespace opcua {
             UA_StatusCode code = res.responseHeader.serviceResult;
 
             sol::variadic_results ret;
-            if (code == UA_STATUSCODE_GOOD && res.registeredNodeIdsSize == 1) {
-                int id = res.registeredNodeIds[0].identifier.numeric;
-                ret.push_back({ L, sol::in_place_type<bool>, true });
-                ret.push_back({ L, sol::in_place_type<int>, id });
+            if (code == UA_STATUSCODE_GOOD) {
+                if (res.registeredNodeIdsSize == 1) {
+                    int id = res.registeredNodeIds[0].identifier.numeric;
+                    RETURN_VALUE(ret, int, id)
+                } else {
+                    RETURN_ERROR(ret, err_register_failed)
+                }
             } else {
-                ret.push_back({ L, sol::in_place_type<bool>, false });
-                ret.push_back({ L, sol::in_place_type<std::string>, std::string(UA_StatusCode_name(code)) });
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
 
-            UA_RegisterNodesRequest_deleteMembers(&req);
-            UA_RegisterNodesResponse_deleteMembers(&res);
-
+            UA_RegisterNodesRequest_clear(&req);
+            UA_RegisterNodesResponse_clear(&res);
             return ret;
         }
 
@@ -184,15 +200,13 @@ namespace opcua {
 
             sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
-                ret.push_back({ L, sol::in_place_type<bool>, true });
+                RETURN_OK(ret)
             } else {
-                ret.push_back({ L, sol::in_place_type<bool>, false });
-                ret.push_back({ L, sol::in_place_type<std::string>, std::string(UA_StatusCode_name(code)) });
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
 
-            UA_UnregisterNodesRequest_deleteMembers(&req);
-            UA_UnregisterNodesResponse_deleteMembers(&res);
-
+            UA_UnregisterNodesRequest_clear(&req);
+            UA_UnregisterNodesResponse_clear(&res);
             return ret;
         }
     };
