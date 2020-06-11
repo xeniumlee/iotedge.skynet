@@ -1,5 +1,6 @@
 #include "open62541/client_highlevel.h"
 #include "open62541/client_config_default.h"
+#include <open62541/plugin/log_stdout.h>
 
 #define SOL_ALL_SAFETIES_ON 1
 
@@ -36,26 +37,102 @@ namespace opcua {
     std::string err_not_supported = "Not supported data type";
     std::string err_register_failed = "Register node failed";
 
+    void stateCallback(UA_Client *client, UA_ClientState clientState) {
+        switch(clientState) {
+            case UA_CLIENTSTATE_DISCONNECTED:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "The client is disconnected");
+                break;
+            case UA_CLIENTSTATE_WAITING_FOR_ACK:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Waiting for ack");
+                break;
+            case UA_CLIENTSTATE_CONNECTED:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "A TCP connection to the server is open");
+                break;
+            case UA_CLIENTSTATE_SECURECHANNEL:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "A SecureChannel to the server is open");
+                break;
+            case UA_CLIENTSTATE_SESSION:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "A session with the server is open");
+                break;
+            case UA_CLIENTSTATE_SESSION_RENEWED:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                            "A session with the server is open (renewed)");
+                break;
+            case UA_CLIENTSTATE_SESSION_DISCONNECTED:
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Session disconnected");
+                break;
+        }
+        return;
+    }
+
     class Client {
     private:
         UA_Client* _client;
         UA_Int16 _ns = -1;
+        std::unordered_map<UA_UInt32, UA_UInt16> _data_type;
 
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
             UA_UInt16 idx;
             UA_String ns = UA_STRING(const_cast<char*>(Namespace.data()));
-            UA_StatusCode ret = UA_Client_NamespaceGetIndex(_client, &ns, &idx);
-            if (ret == UA_STATUSCODE_GOOD) {
+            UA_StatusCode code = UA_Client_NamespaceGetIndex(_client, &ns, &idx);
+            if (code == UA_STATUSCODE_GOOD) {
                 _ns = idx;
             }
+            return code;
+        }
+
+        auto setDataType(UA_UInt32 NodeId, UA_UInt16 Type) {
+            _data_type[NodeId] = Type;
+        }
+
+        auto getDataType(UA_UInt32 NodeId) {
+            auto t = _data_type.find(NodeId);
+            if (t != _data_type.end()) {
+                return t->second;
+            } else {
+                UA_Variant v;
+                UA_Variant_init(&v);
+                const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
+                UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
+
+                if (code == UA_STATUSCODE_GOOD && UA_Variant_isScalar(&v)) {
+                    setDataType(NodeId, v.type->typeIndex);
+                    return _data_type[NodeId];
+                } else {
+                    return (UA_UInt16)UA_TYPES_COUNT;
+                }
+            }
+        }
+
+        auto doWrite(UA_UInt32 NodeId, void* val, sol::this_state L) {
+            sol::variadic_results ret;
+            UA_Variant v;
+            UA_UInt16 t = getDataType(NodeId);
+            if (t != UA_TYPES_COUNT) {
+                UA_Variant_setScalar(&v, val, &UA_TYPES[t]);
+                const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
+                UA_StatusCode code = UA_Client_writeValueAttribute(_client, nodeId, &v);
+                if (code == UA_STATUSCODE_GOOD) {
+                    RETURN_OK(ret)
+                } else {
+                    RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
+                }
+            } else {
+                RETURN_ERROR(ret, err_not_supported)
+            }
+            UA_Variant_clear(&v);
             return ret;
         }
 
     public:
         Client() {
             _client = UA_Client_new();
-            UA_ClientConfig_setDefault(UA_Client_getConfig(_client));
+            UA_ClientConfig *config = UA_Client_getConfig(_client);
+            UA_ClientConfig_setDefault(config);
+            config->stateCallback = stateCallback;
         }
 
         ~Client() {
@@ -63,87 +140,101 @@ namespace opcua {
             UA_Client_delete(_client);
         }
 
-        auto Connect(const std::string& EndpointUrl, const std::string& Namespace) {
-            UA_StatusCode ret = UA_Client_connect(_client, EndpointUrl.data());
-            bool ok = (ret == UA_STATUSCODE_GOOD);
-            if (ok) {
-                ret = setNamespaceIndex(Namespace);
-                ok = (ret == UA_STATUSCODE_GOOD);
-                if (!ok) {
+        auto Connect(const std::string& EndpointUrl, const std::string& Namespace,
+                sol::this_state L) {
+            sol::variadic_results ret;
+            UA_StatusCode code = UA_Client_connect(_client, EndpointUrl.data());
+            if (code == UA_STATUSCODE_GOOD) {
+                code = setNamespaceIndex(Namespace);
+                if (code == UA_STATUSCODE_GOOD) {
+                    RETURN_OK(ret)
+                } else {
                     UA_Client_disconnect(_client);
+                    RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
-                return std::make_tuple(ok, std::string(UA_StatusCode_name(ret)));
             } else {
-                return std::make_tuple(ok, std::string(UA_StatusCode_name(ret)));
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
+            return ret;
         }
 
         auto ConnectUsername(const std::string& EndpointUrl, const std::string& Namespace,
-                const std::string& Username, const std::string& Password) {
-            UA_StatusCode ret =  UA_Client_connect_username(_client, EndpointUrl.data(), Username.data(), Password.data());
-            bool ok = (ret == UA_STATUSCODE_GOOD);
-            if (ok) {
-                ret = setNamespaceIndex(Namespace);
-                ok = (ret == UA_STATUSCODE_GOOD);
-                if (!ok) {
+                const std::string& Username, const std::string& Password,
+                sol::this_state L) {
+            sol::variadic_results ret;
+            UA_StatusCode code =  UA_Client_connect_username(_client, EndpointUrl.data(), Username.data(), Password.data());
+            if (code == UA_STATUSCODE_GOOD) {
+                code = setNamespaceIndex(Namespace);
+                if (code == UA_STATUSCODE_GOOD) {
+                    RETURN_OK(ret)
+                } else {
                     UA_Client_disconnect(_client);
+                    RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
-                return std::make_tuple(ok, std::string(UA_StatusCode_name(ret)));
             } else {
-                return std::make_tuple(ok, std::string(UA_StatusCode_name(ret)));
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
+            return ret;
         }
 
-        auto Disconnect() {
-            UA_StatusCode ret = UA_Client_disconnect(_client);
-            return std::make_tuple(ret == UA_STATUSCODE_GOOD, std::string(UA_StatusCode_name(ret)));
+        auto Disconnect(sol::this_state L) {
+            sol::variadic_results ret;
+            UA_StatusCode code = UA_Client_disconnect(_client);
+            if (code == UA_STATUSCODE_GOOD) {
+                RETURN_OK(ret)
+            } else {
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
+            }
+            return ret;
         }
 
-        auto Read(int NodeId, sol::this_state L) {
-            UA_Variant value;
-            UA_Variant_init(&value);
+        auto Read(UA_UInt32 NodeId, sol::this_state L) {
+            UA_Variant v;
+            UA_Variant_init(&v);
             const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
-            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &value);
+            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
 
             sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
-                if (UA_Variant_isScalar(&value)) {
-                    switch(value.type->typeIndex) {
+                if (UA_Variant_isScalar(&v)) {
+                    setDataType(NodeId, v.type->typeIndex);
+
+                    switch(v.type->typeIndex) {
                         case UA_TYPES_BOOLEAN:
-                            RETURN_VARIANT(ret, UA_Boolean, value)
+                            RETURN_VARIANT(ret, UA_Boolean, v)
                             break;
                         case UA_TYPES_SBYTE:
-                            RETURN_VARIANT(ret, UA_SByte, value)
+                            RETURN_VARIANT(ret, UA_SByte, v)
                             break;
                         case UA_TYPES_BYTE:
-                            RETURN_VARIANT(ret, UA_Byte, value)
+                            RETURN_VARIANT(ret, UA_Byte, v)
                             break;
                         case UA_TYPES_INT16:
-                            RETURN_VARIANT(ret, UA_Int16, value)
+                            RETURN_VARIANT(ret, UA_Int16, v)
                             break;
                         case UA_TYPES_UINT16:
-                            RETURN_VARIANT(ret, UA_UInt16, value)
+                            RETURN_VARIANT(ret, UA_UInt16, v)
                             break;
                         case UA_TYPES_INT32:
-                            RETURN_VARIANT(ret, UA_Int32, value)
+                            RETURN_VARIANT(ret, UA_Int32, v)
                             break;
                         case UA_TYPES_UINT32:
-                            RETURN_VARIANT(ret, UA_UInt32, value)
+                            RETURN_VARIANT(ret, UA_UInt32, v)
                             break;
                         case UA_TYPES_INT64:
-                            RETURN_VARIANT(ret, UA_Int64, value)
+                            RETURN_VARIANT(ret, UA_Int64, v)
                             break;
                         case UA_TYPES_UINT64:
-                            RETURN_VARIANT(ret, UA_UInt64, value)
+                            RETURN_VARIANT(ret, UA_UInt64, v)
                             break;
                         case UA_TYPES_FLOAT:
-                            RETURN_VARIANT(ret, UA_Float, value)
+                            RETURN_VARIANT(ret, UA_Float, v)
                             break;
                         case UA_TYPES_DOUBLE:
-                            RETURN_VARIANT(ret, UA_Double, value)
+                            RETURN_VARIANT(ret, UA_Double, v)
                             break;
                         case UA_TYPES_STRING:
-                            RETURN_STRING(ret, value)
+                            RETURN_STRING(ret, v)
                             break;
                         default:
                             RETURN_ERROR(ret, err_not_supported)
@@ -155,8 +246,25 @@ namespace opcua {
                 RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
 
-            UA_Variant_clear(&value);
+            UA_Variant_clear(&v);
             return ret;
+        }
+
+        auto WriteBoolean(UA_UInt32 NodeId, UA_Boolean val, sol::this_state L) {
+            return doWrite(NodeId, static_cast<void*>(&val), L);
+        }
+
+        auto WriteInteger(UA_UInt32 NodeId, UA_Int64 val, sol::this_state L) {
+            return doWrite(NodeId, static_cast<void*>(&val), L);
+        }
+
+        auto WriteDouble(UA_UInt32 NodeId, UA_Double val, sol::this_state L) {
+            return doWrite(NodeId, static_cast<void*>(&val), L);
+        }
+
+        auto WriteString(UA_UInt32 NodeId, const std::string& val, sol::this_state L) {
+            UA_String str = UA_STRING(const_cast<char*>(val.data()));
+            return doWrite(NodeId, static_cast<void*>(&str), L);
         }
 
         auto Register(const std::string& NodeId, sol::this_state L) {
@@ -173,8 +281,8 @@ namespace opcua {
             sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
                 if (res.registeredNodeIdsSize == 1) {
-                    int id = res.registeredNodeIds[0].identifier.numeric;
-                    RETURN_VALUE(ret, int, id)
+                    UA_UInt32 id = res.registeredNodeIds[0].identifier.numeric;
+                    RETURN_VALUE(ret, UA_UInt32, id)
                 } else {
                     RETURN_ERROR(ret, err_register_failed)
                 }
@@ -187,7 +295,7 @@ namespace opcua {
             return ret;
         }
 
-        auto UnRegister(int NodeId, sol::this_state L) {
+        auto UnRegister(UA_UInt32 NodeId, sol::this_state L) {
             UA_UnregisterNodesRequest req;
             UA_UnregisterNodesRequest_init(&req);
 
@@ -216,8 +324,14 @@ namespace opcua {
         sol::table module = lua.create_table();
 
         module.new_usertype<Client>("client",
-            "connect", sol::overload(&Client::Connect, &Client::ConnectUsername),
+            "connect", sol::overload(&Client::Connect,
+                                     &Client::ConnectUsername),
             "disconnect", &Client::Disconnect,
+            "read", &Client::Read,
+            "write", sol::overload(&Client::WriteBoolean,
+                                   &Client::WriteInteger,
+                                   &Client::WriteDouble,
+                                   &Client::WriteString),
             "register", &Client::Register,
             "unregister", &Client::UnRegister
         );
