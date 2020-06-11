@@ -188,6 +188,20 @@ namespace opcua {
             return ret;
         }
 
+        auto Info(sol::this_state L) {
+            sol::state_view lua(L);
+            sol::table info = lua.create_table();
+
+            info["state"] = UA_Client_getState(_client);
+            UA_ClientConfig *config = UA_Client_getConfig(_client);
+            info["timeout"] = config->timeout;
+            info["securechannel_lifetime"] = config->secureChannelLifeTime;
+            info["requestedsession_timeout"] = config->requestedSessionTimeout;
+            info["connectivity_checkInterval"] = config->connectivityCheckInterval;
+
+            return info;
+        }
+
         auto Read(UA_UInt32 NodeId, sol::this_state L) {
             UA_Variant v;
             UA_Variant_init(&v);
@@ -333,7 +347,8 @@ namespace opcua {
                                    &Client::WriteDouble,
                                    &Client::WriteString),
             "register", &Client::Register,
-            "unregister", &Client::UnRegister
+            "unregister", &Client::UnRegister,
+            "info", &Client::Info
         );
         return module;
     }
