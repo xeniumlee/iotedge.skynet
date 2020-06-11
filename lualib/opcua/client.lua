@@ -5,7 +5,7 @@ local function do_connect(self)
     if not self.__connecting then
         self.__connecting = true
         local ok, err
-        if self.__username and self.__password then
+        if self.__username ~= '' and self.__password ~= '' then
             ok, err = self.__client:connect(self.__url, self.__namespace, self.__username, self.__password)
         else
             ok, err = self.__client:connect(self.__url, self.__namespace)
@@ -26,7 +26,15 @@ end
 
 local channel = {}
 function channel:info()
-    return self.__client:info()
+    local info = self.__client:info()
+    info.url = self.__url
+    info.namespace = self.__namespace
+    return info
+end
+
+function channel:register(nodename)
+    local ok, id, t = self.__client:register(nodename)
+    return ok, id, t
 end
 
 function channel:read(node)

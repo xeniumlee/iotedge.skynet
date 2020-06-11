@@ -62,6 +62,8 @@ local text = {
         invalid_dbnumber_conf = "invalid dbnumber configuration",
         invalid_dt_conf = "invalid datatype for TM or CT area"
     },
+    opcua = {
+    },
     daq = {
         not_online = "device not online",
         poll_start = "poll started",

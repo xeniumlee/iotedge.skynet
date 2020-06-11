@@ -22,6 +22,14 @@ function validator.ipv4(v)
     return type(v)=="string" and v:match("^[%d%.]+$")
 end
 
+function validator.httpurl(v)
+    return type(v)=="string" and v:match("^http://[%w%.%-%/]+$")
+end
+
+function validator.opcurl(v)
+    return type(v)=="string" and v:match("^opc%.tcp://[%d%.]+:%d+%g*$")
+end
+
 function validator.string(v)
     return type(v)=="string" and #v>0
 end

@@ -24,7 +24,6 @@
 }
 
 #define RETURN_VALUE(R, T, V) { \
-    RETURN_OK(R) \
 	R.push_back({ L, sol::in_place_type<T>, V }); \
 }
 
@@ -35,6 +34,7 @@
 
 namespace opcua {
     std::string err_not_supported = "Not supported data type";
+    std::string err_unknown_datatype = "Unknown data type";
     std::string err_register_failed = "Register node failed";
 
     void stateCallback(UA_Client *client, UA_ClientState clientState) {
@@ -84,8 +84,18 @@ namespace opcua {
             return code;
         }
 
-        auto setDataType(UA_UInt32 NodeId, UA_UInt16 Type) {
-            _data_type[NodeId] = Type;
+        auto setDataType(UA_UInt32 NodeId) {
+            UA_Variant v;
+            UA_Variant_init(&v);
+            const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
+            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
+
+            if (code == UA_STATUSCODE_GOOD && UA_Variant_isScalar(&v)) {
+                _data_type[NodeId] = v.type->typeIndex;
+                return std::string(v.type->typeName);
+            } else {
+                return err_unknown_datatype;
+            }
         }
 
         auto getDataType(UA_UInt32 NodeId) {
@@ -93,17 +103,7 @@ namespace opcua {
             if (t != _data_type.end()) {
                 return t->second;
             } else {
-                UA_Variant v;
-                UA_Variant_init(&v);
-                const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
-                UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
-
-                if (code == UA_STATUSCODE_GOOD && UA_Variant_isScalar(&v)) {
-                    setDataType(NodeId, v.type->typeIndex);
-                    return _data_type[NodeId];
-                } else {
-                    return (UA_UInt16)UA_TYPES_COUNT;
-                }
+                return (UA_UInt16)UA_TYPES_COUNT;
             }
         }
 
@@ -121,7 +121,7 @@ namespace opcua {
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, err_not_supported)
+                RETURN_ERROR(ret, err_unknown_datatype)
             }
             UA_Variant_clear(&v);
             return ret;
@@ -211,8 +211,6 @@ namespace opcua {
             sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
                 if (UA_Variant_isScalar(&v)) {
-                    setDataType(NodeId, v.type->typeIndex);
-
                     switch(v.type->typeIndex) {
                         case UA_TYPES_BOOLEAN:
                             RETURN_VARIANT(ret, UA_Boolean, v)
@@ -295,8 +293,13 @@ namespace opcua {
             sol::variadic_results ret;
             if (code == UA_STATUSCODE_GOOD) {
                 if (res.registeredNodeIdsSize == 1) {
+                    RETURN_OK(ret)
+
                     UA_UInt32 id = res.registeredNodeIds[0].identifier.numeric;
                     RETURN_VALUE(ret, UA_UInt32, id)
+
+                    std::string dt = setDataType(id);
+                    RETURN_VALUE(ret, std::string, dt)
                 } else {
                     RETURN_ERROR(ret, err_register_failed)
                 }
