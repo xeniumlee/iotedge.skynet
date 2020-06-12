@@ -224,7 +224,7 @@ end
 
 local function make_poll(dname, unitid, fc, start, number, interval, index)
     local p = cli_pack(fc, start, number)
-    local log_prefix = string.format("dev(%s) slave(%d) fc(%d), start(%d) number(%d)",
+    local log_prefix = strfmt("dev(%s) slave(%d) fc(%d), start(%d) number(%d)",
         dname, unitid, fc, start, number)
     local timeout = interval // 10
 
@@ -543,7 +543,7 @@ end
 local function regdev(d)
     devlist = {}
     for name, dev in pairs(d) do
-        local desc = string.format("unitid(%d)", dev.unitid)
+        local desc = strfmt("unitid(%d)", dev.unitid)
         api.reg_dev(name, desc, dev.retention)
         if dev.batch then
             api.batch_size(name, dev.batch)

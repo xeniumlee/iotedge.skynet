@@ -187,10 +187,10 @@ local function make_poll(dname, area, dbnumber, start, len, interval, index)
 
     local log_prefix
     if dbnumber then
-        log_prefix = string.format("dev(%s) area(%s) db(%d) start(%d) len(%d) words(%d) wordlen(0x%X)",
+        log_prefix = strfmt("dev(%s) area(%s) db(%d) start(%d) len(%d) words(%d) wordlen(0x%X)",
             dname, area, dbnumber, start, len, item.number, item.wordlen)
     else
-        log_prefix = string.format("dev(%s) area(%s) start(%d) len(%d) words(%d) wordlen(0x%X)",
+        log_prefix = strfmt("dev(%s) area(%s) start(%d) len(%d) words(%d) wordlen(0x%X)",
             dname, area, start, len, item.number, item.wordlen)
     end
 

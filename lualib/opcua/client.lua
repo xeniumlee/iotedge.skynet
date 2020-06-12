@@ -37,8 +37,8 @@ function channel:register(nodename)
     return ok, id, t
 end
 
-function channel:read(node)
-    local ok, err = self.__client:read(node)
+function channel:read(nodelist)
+    local ok, err = self.__client:read(nodelist)
     return ok, err
 end
 

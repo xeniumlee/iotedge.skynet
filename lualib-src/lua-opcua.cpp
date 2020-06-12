@@ -10,18 +10,9 @@
 #include "sol2.hpp"
 #endif
 
+namespace opcua {
+
 #define RETURN_OK(R) R.push_back({ L, sol::in_place_type<bool>, true });
-
-#define RETURN_VARIANT(R, T, V) { \
-    RETURN_OK(R) \
-	R.push_back({ L, sol::in_place_type<T>, *(T*)V.data }); \
-}
-
-#define RETURN_STRING(R, V) { \
-    UA_String* str = (UA_String*)V.data; \
-    RETURN_OK(R) \
-	R.push_back({ L, sol::in_place_type<std::string>, std::string(reinterpret_cast<const char*>(str->data), str->length) }); \
-}
 
 #define RETURN_VALUE(R, T, V) { \
 	R.push_back({ L, sol::in_place_type<T>, V }); \
@@ -32,10 +23,9 @@
 	R.push_back({ L, sol::in_place_type<std::string>, E }); \
 }
 
-namespace opcua {
-    std::string err_not_supported = "Not supported data type";
-    std::string err_unknown_datatype = "Unknown data type";
-    std::string err_register_failed = "Register node failed";
+    const size_t maxRead = 200;
+    const std::string err_not_supported = "Not supported data type";
+    const std::string err_unknown_node = "Unknown node info";
 
     void stateCallback(UA_Client *client, UA_ClientState clientState) {
         switch(clientState) {
@@ -71,7 +61,7 @@ namespace opcua {
     private:
         UA_Client* _client;
         UA_Int16 _ns = -1;
-        std::unordered_map<UA_UInt32, UA_UInt16> _data_type;
+        std::unordered_map<UA_UInt32, UA_UInt16> _node_type;
 
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
@@ -84,44 +74,41 @@ namespace opcua {
             return code;
         }
 
-        auto setDataType(UA_UInt32 NodeId) {
+        auto setNodeType(const UA_NodeId& NodeId) {
             UA_Variant v;
             UA_Variant_init(&v);
-            const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
-            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
+            UA_StatusCode code = UA_Client_readValueAttribute(_client, NodeId, &v);
 
+            std::string ret;
             if (code == UA_STATUSCODE_GOOD && UA_Variant_isScalar(&v)) {
-                _data_type[NodeId] = v.type->typeIndex;
-                return std::string(v.type->typeName);
+                UA_UInt32 id = NodeId.identifier.numeric;
+                _node_type[id] = v.type->typeIndex;
+                ret = std::string(v.type->typeName);
             } else {
-                return err_unknown_datatype;
+                ret = err_not_supported;
             }
-        }
-
-        auto getDataType(UA_UInt32 NodeId) {
-            auto t = _data_type.find(NodeId);
-            if (t != _data_type.end()) {
-                return t->second;
-            } else {
-                return (UA_UInt16)UA_TYPES_COUNT;
-            }
+            UA_Variant_clear(&v);
+            return ret;
         }
 
         auto doWrite(UA_UInt32 NodeId, void* val, sol::this_state L) {
             sol::variadic_results ret;
             UA_Variant v;
-            UA_UInt16 t = getDataType(NodeId);
-            if (t != UA_TYPES_COUNT) {
-                UA_Variant_setScalar(&v, val, &UA_TYPES[t]);
-                const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
-                UA_StatusCode code = UA_Client_writeValueAttribute(_client, nodeId, &v);
+
+            auto t = _node_type.find(NodeId);
+            if (t != _node_type.end()) {
+                const UA_NodeId& id = UA_NODEID_NUMERIC(_ns, NodeId);
+                UA_UInt16 tidx = t->second;
+                UA_Variant_setScalar(&v, val, &UA_TYPES[tidx]);
+
+                UA_StatusCode code = UA_Client_writeValueAttribute(_client, id, &v);
                 if (code == UA_STATUSCODE_GOOD) {
                     RETURN_OK(ret)
                 } else {
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, err_unknown_datatype)
+                RETURN_ERROR(ret, err_unknown_node)
             }
             UA_Variant_clear(&v);
             return ret;
@@ -202,63 +189,111 @@ namespace opcua {
             return info;
         }
 
-        auto Read(UA_UInt32 NodeId, sol::this_state L) {
-            UA_Variant v;
-            UA_Variant_init(&v);
-            const UA_NodeId nodeId = UA_NODEID_NUMERIC(_ns, NodeId);
-            UA_StatusCode code = UA_Client_readValueAttribute(_client, nodeId, &v);
+        auto Read(sol::table NodeList, sol::this_state L) {
+            size_t count = NodeList.size();
 
-            sol::variadic_results ret;
-            if (code == UA_STATUSCODE_GOOD) {
-                if (UA_Variant_isScalar(&v)) {
-                    switch(v.type->typeIndex) {
-                        case UA_TYPES_BOOLEAN:
-                            RETURN_VARIANT(ret, UA_Boolean, v)
-                            break;
-                        case UA_TYPES_SBYTE:
-                            RETURN_VARIANT(ret, UA_SByte, v)
-                            break;
-                        case UA_TYPES_BYTE:
-                            RETURN_VARIANT(ret, UA_Byte, v)
-                            break;
-                        case UA_TYPES_INT16:
-                            RETURN_VARIANT(ret, UA_Int16, v)
-                            break;
-                        case UA_TYPES_UINT16:
-                            RETURN_VARIANT(ret, UA_UInt16, v)
-                            break;
-                        case UA_TYPES_INT32:
-                            RETURN_VARIANT(ret, UA_Int32, v)
-                            break;
-                        case UA_TYPES_UINT32:
-                            RETURN_VARIANT(ret, UA_UInt32, v)
-                            break;
-                        case UA_TYPES_INT64:
-                            RETURN_VARIANT(ret, UA_Int64, v)
-                            break;
-                        case UA_TYPES_UINT64:
-                            RETURN_VARIANT(ret, UA_UInt64, v)
-                            break;
-                        case UA_TYPES_FLOAT:
-                            RETURN_VARIANT(ret, UA_Float, v)
-                            break;
-                        case UA_TYPES_DOUBLE:
-                            RETURN_VARIANT(ret, UA_Double, v)
-                            break;
-                        case UA_TYPES_STRING:
-                            RETURN_STRING(ret, v)
-                            break;
-                        default:
-                            RETURN_ERROR(ret, err_not_supported)
-                    }
-                } else {
-                    RETURN_ERROR(ret, err_not_supported)
-                }
-            } else {
-                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
+            UA_ReadValueId ids[maxRead];
+            for(size_t i = 0, j = 1; i != count; i++, j++) {
+                UA_ReadValueId_init(&ids[i]);
+
+                ids[i].attributeId = UA_ATTRIBUTEID_VALUE;
+                UA_UInt32 id = NodeList[j]["id"];
+                ids[i].nodeId = UA_NODEID_NUMERIC(_ns, id);
             }
 
-            UA_Variant_clear(&v);
+            UA_ReadRequest req;
+            UA_ReadRequest_init(&req);
+            req.nodesToRead = ids;
+            req.nodesToReadSize = count;
+
+            UA_ReadResponse res = UA_Client_Service_read(_client, req);
+            UA_StatusCode code = res.responseHeader.serviceResult;
+            if (code == UA_STATUSCODE_GOOD && res.resultsSize != count )
+                code = UA_STATUSCODE_BADUNEXPECTEDERROR;
+
+            sol::variadic_results ret;
+            if (code != UA_STATUSCODE_GOOD) {
+                UA_ReadResponse_clear(&res);
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
+                return ret;
+            }
+
+            for(size_t i = 0, j = 1; i != count; i++, j++) {
+                const UA_DataValue& dv = res.results[i];
+                code = dv.status;
+
+                if (code != UA_STATUSCODE_GOOD || !dv.hasValue) {
+                    if (code == UA_STATUSCODE_GOOD)
+                        code = UA_STATUSCODE_BADUNEXPECTEDERROR;
+                    NodeList[j]["ok"] = false;
+                    NodeList[j]["ret"] = std::string(UA_StatusCode_name(code));
+                } else {
+                    const UA_Variant& v = dv.value;
+                    if (UA_Variant_isScalar(&v)) {
+                        switch(v.type->typeIndex) {
+                            case UA_TYPES_BOOLEAN:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Boolean*)v.data;
+                                break;
+                            case UA_TYPES_SBYTE:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_SByte*)v.data;
+                                break;
+                            case UA_TYPES_BYTE:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Byte*)v.data;
+                                break;
+                            case UA_TYPES_INT16:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Int16*)v.data;
+                                break;
+                            case UA_TYPES_UINT16:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_UInt16*)v.data;
+                                break;
+                            case UA_TYPES_INT32:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Int32*)v.data;
+                                break;
+                            case UA_TYPES_UINT32:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_UInt32*)v.data;
+                                break;
+                            case UA_TYPES_INT64:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Int64*)v.data;
+                                break;
+                            case UA_TYPES_UINT64:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_UInt64*)v.data;
+                                break;
+                            case UA_TYPES_FLOAT:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Float*)v.data;
+                                break;
+                            case UA_TYPES_DOUBLE:
+                                NodeList[j]["ok"] = true;
+                                NodeList[j]["ret"] = *(UA_Double*)v.data;
+                                break;
+                            case UA_TYPES_STRING:
+                                {
+                                    UA_String* str = (UA_String*)v.data;
+                                    NodeList[j]["ok"] = true;
+                                    NodeList[j]["ret"] = std::string(reinterpret_cast<const char*>(str->data), str->length);
+                                    break;
+                                }
+                            default:
+                                NodeList[j]["ok"] = false;
+                                NodeList[j]["ret"] = err_not_supported;
+                        }
+                    } else {
+                        NodeList[j]["ok"] = false;
+                        NodeList[j]["ret"] = err_not_supported;
+                    }
+                }
+            }
+            UA_ReadResponse_clear(&res);
+            RETURN_OK(ret)
             return ret;
         }
 
@@ -283,8 +318,8 @@ namespace opcua {
             UA_RegisterNodesRequest req;
             UA_RegisterNodesRequest_init(&req);
 
-            req.nodesToRegister = UA_NodeId_new();
-            req.nodesToRegister[0] = UA_NODEID_STRING(_ns, const_cast<char*>(NodeId.data()));
+            UA_NodeId id = UA_NODEID_STRING(_ns, const_cast<char*>(NodeId.data()));
+            req.nodesToRegister = &id;
             req.nodesToRegisterSize = 1;
 
             UA_RegisterNodesResponse res = UA_Client_Service_registerNodes(_client, req);
@@ -295,19 +330,18 @@ namespace opcua {
                 if (res.registeredNodeIdsSize == 1) {
                     RETURN_OK(ret)
 
-                    UA_UInt32 id = res.registeredNodeIds[0].identifier.numeric;
+                    UA_UInt32 id = res.registeredNodeIds->identifier.numeric;
                     RETURN_VALUE(ret, UA_UInt32, id)
 
-                    std::string dt = setDataType(id);
+                    std::string dt = setNodeType(*(res.registeredNodeIds));
                     RETURN_VALUE(ret, std::string, dt)
                 } else {
-                    RETURN_ERROR(ret, err_register_failed)
+                    RETURN_ERROR(ret, std::string(UA_StatusCode_name(UA_STATUSCODE_BADUNEXPECTEDERROR)))
                 }
             } else {
                 RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
 
-            UA_RegisterNodesRequest_clear(&req);
             UA_RegisterNodesResponse_clear(&res);
             return ret;
         }
@@ -316,8 +350,8 @@ namespace opcua {
             UA_UnregisterNodesRequest req;
             UA_UnregisterNodesRequest_init(&req);
 
-            req.nodesToUnregister = UA_NodeId_new();
-            req.nodesToUnregister[0] = UA_NODEID_NUMERIC(_ns, NodeId);
+            UA_NodeId id = UA_NODEID_NUMERIC(_ns, NodeId);
+            req.nodesToUnregister = &id;
             req.nodesToUnregisterSize = 1;
 
             UA_UnregisterNodesResponse res = UA_Client_Service_unregisterNodes(_client, req);
@@ -329,8 +363,11 @@ namespace opcua {
             } else {
                 RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
+            auto t = _node_type.find(NodeId);
+            if (t != _node_type.end()) {
+                _node_type.erase(t);
+            }
 
-            UA_UnregisterNodesRequest_clear(&req);
             UA_UnregisterNodesResponse_clear(&res);
             return ret;
         }
