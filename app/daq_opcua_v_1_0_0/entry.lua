@@ -12,9 +12,9 @@ local strfmt = string.format
 local cli
 local running = false
 local max_wait = 100 * 60 -- 1 min
+local max_read = 200
 local poll_min = 10 -- ms
 local poll_max = 1000 * 60 * 60 -- 1 hour
-local max_addr = 0xFFFFFF -- TReqFunReadItem  byte    Address[3]
 local devlist = {}
 
 local cmd_desc = {
@@ -48,7 +48,8 @@ function list(dev)
                 for name, t in pairs(d.tags) do
                     h[name] = {
                         node = t.node,
-                        dt = t.dt
+                        dt = t.dt,
+                        id = t.id
                     }
                 end
                 d.help = h
@@ -69,14 +70,13 @@ function read(dev, tag)
             assert(devlist[dev].tags[tag], daqtxt.invalid_tag)
 
             local t = devlist[dev].tags[tag]
-            local item = { id = t.id }
 
             -- all tag can be read, no check here
-            local ok, ret = cli:read(item)
+            local ok, ret = cli:read({t})
             assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
-            assert(item.ok, strfmt("%s:%s", daqtxt.req_fail, item.ret))
+            assert(t.ok, strfmt("%s:%s", daqtxt.req_fail, t.val))
 
-            return item.ret
+            return t.val
         end)
     else
         return false, daqtxt.not_online
@@ -141,16 +141,20 @@ local function gain(t)
 end
 
 local function do_post(t, dname, ts, attr)
-    if t.cov then
-        gain(t)
-        api.post_cov(dname, { [t.name] = t.val })
-    else
-        gain(t)
-        if t.mode == "ts" then
-            ts[t.name] = t.val
+    if t.ok then
+        if t.cov then
+            gain(t)
+            api.post_cov(dname, { [t.name] = t.val })
         else
-            attr[t.name] = t.val
+            gain(t)
+            if t.mode == "ts" then
+                ts[t.name] = t.val
+            else
+                attr[t.name] = t.val
+            end
         end
+    else
+        log.error(strfmt("dev(%s) tag(%s) %s:%s", dname, t.name, daqtxt.req_fail, t.val))
     end
 end
 
@@ -173,11 +177,8 @@ local function make_poll(dname, taglist, interval)
     local function poll()
         while running do
             local ok, err = pcall(function()
-                for _, t in pairs(taglist) do
-                    local ok, ret = cli:read(t.id)
-                    assert(ok, strfmt("dev(%s) tag(%s) %s:%s", dname, t.name, daqtxt.req_fail, ret))
-                    t.val = ret
-                end
+                local ok, ret = cli:read(taglist)
+                assert(ok, strfmt("dev(%s) %s:%s", dname, daqtxt.req_fail, ret))
                 post(dname, taglist)
             end)
             if not ok then
@@ -190,12 +191,27 @@ local function make_poll(dname, taglist, interval)
 end
 
 local function make_polls(dname, taglist, polls)
+    local list = {}
     for _, t in pairs(taglist) do
-
-        local function make()
-            local poll = make_poll(dname, key, dbnumber,
-                start, len, interval, index)
-            tblins(polls, poll)
+        local p = t.poll
+        if not list[p] then
+            list[p] = { idx = 1, size = 0, list = {{}} }
+        end
+        local tbl = list[p]
+        tblins(tbl.list[tbl.idx], t)
+        tbl.size = tbl.size + 1
+        if tbl.size == max_read then
+            tbl.idx = tbl.idx + 1
+            tbl.size = 0
+            tbl.list[tbl.idx] = {}
+        end
+    end
+    for interval, l in pairs(list) do
+        for _, tags in pairs(l.list) do
+            if #tags ~= 0 then
+                local poll = make_poll(dname, tags, interval)
+                tblins(polls, poll)
+            end
         end
     end
 end
@@ -228,7 +244,7 @@ local tag_schema = {
     end
 }
 
-local function validate_tags(dev, model)
+local function validate_tags(dev)
     local max_poll = 0
     for name, t in pairs(dev.tags) do
         assert(type(name)=="string", daqtxt.invalid_tag_conf)
@@ -239,7 +255,8 @@ local function validate_tags(dev, model)
             assert(t.dt ~= "string" and t.dt ~= "bool", daqtxt.invalid_tag_conf)
         end
 
-        local ok, id, dt = cli:register(t.node)
+        local id, dt
+        ok, id, dt = cli:register(t.node)
         assert(ok, id)
         fill_tag(t, name, id, dt, dev)
 
@@ -261,7 +278,7 @@ local d_schema = {
     end
 }
 
-local function validate_devices(d, model)
+local function validate_devices(d)
     local polls = {}
     local max = 0
     for name, dev in pairs(d) do
@@ -269,7 +286,7 @@ local function validate_devices(d, model)
         local ok = pcall(validator.check, dev, d_schema)
         assert(ok, daqtxt.invalid_device_conf)
 
-        local max_poll = validate_tags(dev, model)
+        local max_poll = validate_tags(dev)
         if max_poll > max then
             max = max_poll
         end
@@ -319,7 +336,7 @@ local function start(d, polls, model)
 end
 
 local function config_devices(d, model)
-    local ok, polls, max = pcall(validate_devices, d, model)
+    local ok, polls, max = pcall(validate_devices, d)
     if ok then
         max_wait = max // 10
         skynet.fork(start, d, polls, model)
@@ -350,7 +367,11 @@ local function config_transport(t)
     else
         stop()
         ok, cli = pcall(client.new, t)
-        return ok
+        if ok then
+            return cli:connect()
+        else
+            return ok
+        end
     end
 end
 

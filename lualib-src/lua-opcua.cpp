@@ -179,6 +179,7 @@ namespace opcua {
             sol::state_view lua(L);
             sol::table info = lua.create_table();
 
+            info["ns_index"] = _ns;
             info["state"] = UA_Client_getState(_client);
             UA_ClientConfig *config = UA_Client_getConfig(_client);
             info["timeout"] = config->timeout;
@@ -226,69 +227,69 @@ namespace opcua {
                     if (code == UA_STATUSCODE_GOOD)
                         code = UA_STATUSCODE_BADUNEXPECTEDERROR;
                     NodeList[j]["ok"] = false;
-                    NodeList[j]["ret"] = std::string(UA_StatusCode_name(code));
+                    NodeList[j]["val"] = std::string(UA_StatusCode_name(code));
                 } else {
                     const UA_Variant& v = dv.value;
                     if (UA_Variant_isScalar(&v)) {
                         switch(v.type->typeIndex) {
                             case UA_TYPES_BOOLEAN:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Boolean*)v.data;
+                                NodeList[j]["val"] = *(UA_Boolean*)v.data;
                                 break;
                             case UA_TYPES_SBYTE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_SByte*)v.data;
+                                NodeList[j]["val"] = *(UA_SByte*)v.data;
                                 break;
                             case UA_TYPES_BYTE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Byte*)v.data;
+                                NodeList[j]["val"] = *(UA_Byte*)v.data;
                                 break;
                             case UA_TYPES_INT16:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Int16*)v.data;
+                                NodeList[j]["val"] = *(UA_Int16*)v.data;
                                 break;
                             case UA_TYPES_UINT16:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_UInt16*)v.data;
+                                NodeList[j]["val"] = *(UA_UInt16*)v.data;
                                 break;
                             case UA_TYPES_INT32:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Int32*)v.data;
+                                NodeList[j]["val"] = *(UA_Int32*)v.data;
                                 break;
                             case UA_TYPES_UINT32:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_UInt32*)v.data;
+                                NodeList[j]["val"] = *(UA_UInt32*)v.data;
                                 break;
                             case UA_TYPES_INT64:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Int64*)v.data;
+                                NodeList[j]["val"] = *(UA_Int64*)v.data;
                                 break;
                             case UA_TYPES_UINT64:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_UInt64*)v.data;
+                                NodeList[j]["val"] = *(UA_UInt64*)v.data;
                                 break;
                             case UA_TYPES_FLOAT:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Float*)v.data;
+                                NodeList[j]["val"] = *(UA_Float*)v.data;
                                 break;
                             case UA_TYPES_DOUBLE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["ret"] = *(UA_Double*)v.data;
+                                NodeList[j]["val"] = *(UA_Double*)v.data;
                                 break;
                             case UA_TYPES_STRING:
                                 {
                                     UA_String* str = (UA_String*)v.data;
                                     NodeList[j]["ok"] = true;
-                                    NodeList[j]["ret"] = std::string(reinterpret_cast<const char*>(str->data), str->length);
+                                    NodeList[j]["val"] = std::string(reinterpret_cast<const char*>(str->data), str->length);
                                     break;
                                 }
                             default:
                                 NodeList[j]["ok"] = false;
-                                NodeList[j]["ret"] = err_not_supported;
+                                NodeList[j]["val"] = err_not_supported;
                         }
                     } else {
                         NodeList[j]["ok"] = false;
-                        NodeList[j]["ret"] = err_not_supported;
+                        NodeList[j]["val"] = err_not_supported;
                     }
                 }
             }
@@ -394,6 +395,6 @@ namespace opcua {
     }
 }
 
-extern "C" int luaopen_snap7(lua_State *L) {
+extern "C" int luaopen_opcua(lua_State *L) {
     return sol::stack::call_lua(L, 1, opcua::open);
 }

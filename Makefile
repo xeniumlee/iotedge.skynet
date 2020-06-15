@@ -59,8 +59,8 @@ OPEN62541_SRC = 3rd/open62541-1.0.1
 LUA_OPCUA_BIN = $(BUILD_PATH)/opcua.so
 LUA_OPCUA_SRC = $(LUA_LIB_SRC)/lua-opcua.cpp
 LUA_OPCUA_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXXFLAGS)
-$(LUA_OPCUA_BIN): $(LUA_OPCUA_SRC) $(SNAP7_SRC)/snap7.cpp $(SNAP7_BIN)
-	$(LUA_OPCUA_CXX) $^ -o $@ -I$(LUA_SRC) -I$(OPEN62541_SRC) -I$(SKYNET_SRC)
+$(LUA_OPCUA_BIN): $(LUA_OPCUA_SRC) $(OPEN62541_SRC)/open62541/types_generated.c $(OPEN62541_BIN)
+	$(LUA_OPCUA_CXX) $^ -o $@ -I$(LUA_SRC) -I$(OPEN62541_SRC)
 
 LUA_SERIAL_BIN = $(BUILD_PATH)/serial.so
 LUA_SERIAL_SRC = $(LUA_LIB_SRC)/lua-serial.cpp

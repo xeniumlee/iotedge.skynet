@@ -78,7 +78,6 @@ function client.new(desc)
         __password = desc.password,
         __connecting = false,
     }, client_meta)
-    skynet.fork(do_connect, self)
 
     return self
 end
