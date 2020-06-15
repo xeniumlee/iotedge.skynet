@@ -33,18 +33,15 @@ function channel:info()
 end
 
 function channel:register(nodename)
-    local ok, id, t = self.__client:register(nodename)
-    return ok, id, t
+    return self.__client:register(nodename)
 end
 
 function channel:read(nodelist)
-    local ok, err = self.__client:read(nodelist)
-    return ok, err
+    return self.__client:read(nodelist)
 end
 
-function channel:write(node, val)
-    local ok, err = self.__client:write(node, val)
-    return ok, err
+function channel:write(node, dtidx, val)
+    return self.__client:write(node, dtidx, val)
 end
 
 function channel:connect()

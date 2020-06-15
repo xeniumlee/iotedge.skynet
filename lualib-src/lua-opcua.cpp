@@ -25,7 +25,6 @@ namespace opcua {
 
     const size_t maxRead = 200;
     const std::string err_not_supported = "Not supported data type";
-    const std::string err_unknown_node = "Unknown node info";
 
     void stateCallback(UA_Client *client, UA_ClientState clientState) {
         switch(clientState) {
@@ -61,7 +60,6 @@ namespace opcua {
     private:
         UA_Client* _client;
         UA_Int16 _ns = -1;
-        std::unordered_map<UA_UInt32, UA_UInt16> _node_type;
 
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
@@ -74,32 +72,28 @@ namespace opcua {
             return code;
         }
 
-        auto setNodeType(const UA_NodeId& NodeId) {
+        auto getNodeType(const UA_NodeId& NodeId) {
             UA_Variant v;
             UA_Variant_init(&v);
             UA_StatusCode code = UA_Client_readValueAttribute(_client, NodeId, &v);
 
-            std::string ret;
+            UA_Int16 ret;
             if (code == UA_STATUSCODE_GOOD && UA_Variant_isScalar(&v)) {
-                UA_UInt32 id = NodeId.identifier.numeric;
-                _node_type[id] = v.type->typeIndex;
-                ret = std::string(v.type->typeName);
+                ret = v.type->typeIndex;
             } else {
-                ret = err_not_supported;
+                ret = -1;
             }
             UA_Variant_clear(&v);
             return ret;
         }
 
-        auto doWrite(UA_UInt32 NodeId, void* val, sol::this_state L) {
+        auto doWrite(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, void* Val, sol::this_state L) {
             sol::variadic_results ret;
             UA_Variant v;
 
-            auto t = _node_type.find(NodeId);
-            if (t != _node_type.end()) {
+            if (DataTypeIndex > -1 && DataTypeIndex < UA_TYPES_COUNT) {
                 const UA_NodeId& id = UA_NODEID_NUMERIC(_ns, NodeId);
-                UA_UInt16 tidx = t->second;
-                UA_Variant_setScalar(&v, val, &UA_TYPES[tidx]);
+                UA_Variant_setScalar(&v, Val, &UA_TYPES[DataTypeIndex]);
 
                 UA_StatusCode code = UA_Client_writeValueAttribute(_client, id, &v);
                 if (code == UA_STATUSCODE_GOOD) {
@@ -108,9 +102,8 @@ namespace opcua {
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, err_unknown_node)
+                RETURN_ERROR(ret, err_not_supported)
             }
-            UA_Variant_clear(&v);
             return ret;
         }
 
@@ -298,21 +291,21 @@ namespace opcua {
             return ret;
         }
 
-        auto WriteBoolean(UA_UInt32 NodeId, UA_Boolean val, sol::this_state L) {
-            return doWrite(NodeId, static_cast<void*>(&val), L);
+        auto WriteBoolean(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, UA_Boolean Val, sol::this_state L) {
+            return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&Val), L);
         }
 
-        auto WriteInteger(UA_UInt32 NodeId, UA_Int64 val, sol::this_state L) {
-            return doWrite(NodeId, static_cast<void*>(&val), L);
+        auto WriteInteger(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, UA_Int64 Val, sol::this_state L) {
+            return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&Val), L);
         }
 
-        auto WriteDouble(UA_UInt32 NodeId, UA_Double val, sol::this_state L) {
-            return doWrite(NodeId, static_cast<void*>(&val), L);
+        auto WriteDouble(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, UA_Double Val, sol::this_state L) {
+            return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&Val), L);
         }
 
-        auto WriteString(UA_UInt32 NodeId, const std::string& val, sol::this_state L) {
-            UA_String str = UA_STRING(const_cast<char*>(val.data()));
-            return doWrite(NodeId, static_cast<void*>(&str), L);
+        auto WriteString(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, const std::string& Val, sol::this_state L) {
+            UA_String str = UA_STRING(const_cast<char*>(Val.data()));
+            return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&str), L);
         }
 
         auto Register(const std::string& NodeId, sol::this_state L) {
@@ -334,8 +327,15 @@ namespace opcua {
                     UA_UInt32 id = res.registeredNodeIds->identifier.numeric;
                     RETURN_VALUE(ret, UA_UInt32, id)
 
-                    std::string dt = setNodeType(*(res.registeredNodeIds));
-                    RETURN_VALUE(ret, std::string, dt)
+                    UA_Int16 dtidx = getNodeType(*(res.registeredNodeIds));
+                    if (dtidx != -1 ) {
+                        RETURN_VALUE(ret, UA_Int16, dtidx)
+                        RETURN_VALUE(ret, std::string, std::string(UA_TYPES[dtidx].typeName))
+                    } else {
+                        RETURN_VALUE(ret, UA_Int16, dtidx)
+                        RETURN_VALUE(ret, std::string, err_not_supported)
+                    }
+
                 } else {
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(UA_STATUSCODE_BADUNEXPECTEDERROR)))
                 }
@@ -363,10 +363,6 @@ namespace opcua {
                 RETURN_OK(ret)
             } else {
                 RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
-            }
-            auto t = _node_type.find(NodeId);
-            if (t != _node_type.end()) {
-                _node_type.erase(t);
             }
 
             UA_UnregisterNodesResponse_clear(&res);

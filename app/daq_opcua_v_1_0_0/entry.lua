@@ -47,8 +47,9 @@ function list(dev)
                 local h = {}
                 for name, t in pairs(d.tags) do
                     h[name] = {
+                        mode = t.mode,
                         node = t.node,
-                        dt = t.dt,
+                        dt = t.dtname,
                         id = t.id
                     }
                 end
@@ -91,7 +92,7 @@ local function do_write(dev, tag, value)
     local t = devlist[dev].tags[tag]
     assert(t.mode == "ctrl", daqtxt.read_only)
 
-    local ok, ret = cli:write(t.id, value)
+    local ok, ret = cli:write(t.id, t.dtidx, value)
     assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
 
     log.info(daqtxt.write_suc, dev, tag, tostring(value))
@@ -193,17 +194,19 @@ end
 local function make_polls(dname, taglist, polls)
     local list = {}
     for _, t in pairs(taglist) do
-        local p = t.poll
-        if not list[p] then
-            list[p] = { idx = 1, size = 0, list = {{}} }
-        end
-        local tbl = list[p]
-        tblins(tbl.list[tbl.idx], t)
-        tbl.size = tbl.size + 1
-        if tbl.size == max_read then
-            tbl.idx = tbl.idx + 1
-            tbl.size = 0
-            tbl.list[tbl.idx] = {}
+        if t.mode ~= "ctrl" then
+            local p = t.poll
+            if not list[p] then
+                list[p] = { idx = 1, size = 0, list = {{}} }
+            end
+            local tbl = list[p]
+            tblins(tbl.list[tbl.idx], t)
+            tbl.size = tbl.size + 1
+            if tbl.size == max_read then
+                tbl.idx = tbl.idx + 1
+                tbl.size = 0
+                tbl.list[tbl.idx] = {}
+            end
         end
     end
     for interval, l in pairs(list) do
@@ -216,10 +219,11 @@ local function make_polls(dname, taglist, polls)
     end
 end
 
-local function fill_tag(t, name, id, dt, dev)
+local function fill_tag(t, name, id, dtidx, dtname, dev)
     t.name = name
     t.id = id
-    t.dt = dt
+    t.dtidx = dtidx
+    t.dtname = dtname
     if t.mode == "ts" then
         t.poll = t.poll or dev.ts_poll
     elseif t.mode == "attr" then
@@ -255,13 +259,15 @@ local function validate_tags(dev)
             assert(t.dt ~= "string" and t.dt ~= "bool", daqtxt.invalid_tag_conf)
         end
 
-        local id, dt
-        ok, id, dt = cli:register(t.node)
+        local id, dtidx, dtname
+        ok, id, dtidx, dtname = cli:register(t.node)
         assert(ok, id)
-        fill_tag(t, name, id, dt, dev)
+        fill_tag(t, name, id, dtidx, dtname, dev)
 
-        if t.poll > max_poll then
-            max_poll = t.poll
+        if t.mode ~= "ctrl" then
+            if t.poll > max_poll then
+                max_poll = t.poll
+            end
         end
     end
     return max_poll
