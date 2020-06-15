@@ -1,6 +1,5 @@
 #include "open62541/client_highlevel.h"
 #include "open62541/client_config_default.h"
-#include <open62541/plugin/log_stdout.h>
 
 #define SOL_ALL_SAFETIES_ON 1
 
@@ -23,43 +22,15 @@ namespace opcua {
 	R.push_back({ L, sol::in_place_type<std::string>, E }); \
 }
 
+    void stateCallback(UA_Client*, UA_ClientState);
     const size_t maxRead = 200;
     const std::string err_not_supported = "Not supported data type";
-
-    void stateCallback(UA_Client *client, UA_ClientState clientState) {
-        switch(clientState) {
-            case UA_CLIENTSTATE_DISCONNECTED:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "The client is disconnected");
-                break;
-            case UA_CLIENTSTATE_WAITING_FOR_ACK:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Waiting for ack");
-                break;
-            case UA_CLIENTSTATE_CONNECTED:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "A TCP connection to the server is open");
-                break;
-            case UA_CLIENTSTATE_SECURECHANNEL:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "A SecureChannel to the server is open");
-                break;
-            case UA_CLIENTSTATE_SESSION:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "A session with the server is open");
-                break;
-            case UA_CLIENTSTATE_SESSION_RENEWED:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                            "A session with the server is open (renewed)");
-                break;
-            case UA_CLIENTSTATE_SESSION_DISCONNECTED:
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Session disconnected");
-                break;
-        }
-        return;
-    }
 
     class Client {
     private:
         UA_Client* _client;
         UA_Int16 _ns = -1;
+        sol::function _cb;
 
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
@@ -108,16 +79,23 @@ namespace opcua {
         }
 
     public:
-        Client() {
+        Client(sol::function StateCB) : _cb(StateCB) {
             _client = UA_Client_new();
             UA_ClientConfig *config = UA_Client_getConfig(_client);
             UA_ClientConfig_setDefault(config);
             config->stateCallback = stateCallback;
+            config->logger.log = NULL;
+            config->logger.clear = NULL;
+            config->clientContext = static_cast<void*>(this);
         }
 
         ~Client() {
             UA_Client_disconnect(_client);
             UA_Client_delete(_client);
+        }
+
+        auto CallStateCB(UA_ClientState clientState) {
+            _cb(clientState);
         }
 
         auto Connect(const std::string& EndpointUrl, const std::string& Namespace,
@@ -370,11 +348,17 @@ namespace opcua {
         }
     };
 
+    void stateCallback(UA_Client *client, UA_ClientState clientState) {
+        Client* cli = static_cast<Client*>(UA_Client_getContext(client));
+        cli->CallStateCB(clientState);
+    }
+
     sol::table open(sol::this_state L) {
         sol::state_view lua(L);
         sol::table module = lua.create_table();
 
         module.new_usertype<Client>("client",
+            sol::constructors<Client(sol::function)>(),
             "connect", sol::overload(&Client::Connect,
                                      &Client::ConnectUsername),
             "disconnect", &Client::Disconnect,

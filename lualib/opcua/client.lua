@@ -24,12 +24,32 @@ local function do_connect(self)
     end
 end
 
+local state = {
+    [0] = "The client is disconnected",
+    [1] = "The client has sent HELLO and waiting",
+    [2] = "A TCP connection to the server is open",
+    [3] = "A secureChannel to the server is open",
+    [4] = "A session with the server is open",
+    [5] = "A session with the server is disconnected",
+    [6] = "A session with the server is open (renewed)"
+}
+
 local channel = {}
 function channel:info()
     local info = self.__client:info()
     info.url = self.__url
     info.namespace = self.__namespace
+    info.state = state[info.state]
     return info
+end
+
+function channel:state(s)
+    local ret = state[s]
+    if ret then
+        return ret
+    else
+        return "unknown state"
+    end
 end
 
 function channel:register(nodename)
@@ -63,9 +83,10 @@ local client_meta = {
 }
 
 local client = {}
-function client.new(desc)
+function client.new(desc, cb)
     assert(desc.url and desc.namespace)
-    local cli = assert(opcua.client.new())
+    assert(type(cb) == "function")
+    local cli = assert(opcua.client.new(cb))
 
     local self = setmetatable({
         __client = cli,

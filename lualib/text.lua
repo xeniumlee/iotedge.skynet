@@ -63,6 +63,7 @@ local text = {
         invalid_dt_conf = "invalid datatype for TM or CT area"
     },
     opcua = {
+        state_changed = "client state changed"
     },
     daq = {
         not_online = "device not online",

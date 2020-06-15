@@ -366,13 +366,17 @@ local t_schema = {
     model = validator.vals("S7_PLC_1200_1500")
 }
 
+local function state_changed(state)
+    log.info(opcuatxt.state_changed, cli:state(state))
+end
+
 local function config_transport(t)
     local ok = pcall(validator.check, t, t_schema)
     if not ok then
         return ok
     else
         stop()
-        ok, cli = pcall(client.new, t)
+        ok, cli = pcall(client.new, t, state_changed)
         if ok then
             return cli:connect()
         else
