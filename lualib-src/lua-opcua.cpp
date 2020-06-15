@@ -205,51 +205,51 @@ namespace opcua {
                         switch(v.type->typeIndex) {
                             case UA_TYPES_BOOLEAN:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Boolean*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Boolean*>(v.data);
                                 break;
                             case UA_TYPES_SBYTE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_SByte*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_SByte*>(v.data);
                                 break;
                             case UA_TYPES_BYTE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Byte*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Byte*>(v.data);
                                 break;
                             case UA_TYPES_INT16:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Int16*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Int16*>(v.data);
                                 break;
                             case UA_TYPES_UINT16:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_UInt16*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_UInt16*>(v.data);
                                 break;
                             case UA_TYPES_INT32:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Int32*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Int32*>(v.data);
                                 break;
                             case UA_TYPES_UINT32:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_UInt32*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_UInt32*>(v.data);
                                 break;
                             case UA_TYPES_INT64:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Int64*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Int64*>(v.data);
                                 break;
                             case UA_TYPES_UINT64:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_UInt64*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_UInt64*>(v.data);
                                 break;
                             case UA_TYPES_FLOAT:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Float*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Float*>(v.data);
                                 break;
                             case UA_TYPES_DOUBLE:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *(UA_Double*)v.data;
+                                NodeList[j]["val"] = *static_cast<UA_Double*>(v.data);
                                 break;
                             case UA_TYPES_STRING:
                                 {
-                                    UA_String* str = (UA_String*)v.data;
+                                    UA_String* str = static_cast<UA_String*>(v.data);
                                     NodeList[j]["ok"] = true;
                                     NodeList[j]["val"] = std::string(reinterpret_cast<const char*>(str->data), str->length);
                                     break;
