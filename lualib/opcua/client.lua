@@ -1,6 +1,21 @@
 local skynet = require "skynet"
 local opcua = require "opcua"
 
+local state = {
+    [0] = "The client is disconnected",
+    [1] = "The client has sent HELLO and waiting",
+    [2] = "A TCP connection to the server is open",
+    [3] = "A secureChannel to the server is open",
+    [4] = "A session with the server is open",
+    [5] = "A session with the server is disconnected",
+    [6] = "A session with the server is open (renewed)"
+}
+
+local errinfo = {
+    not_registered = "node not registered",
+    invalid_datatype = "invalid datatype"
+}
+
 local function do_connect(self)
     local ok, err
     if self.__username ~= '' and self.__password ~= '' then
@@ -46,14 +61,67 @@ local function try_connect(self, retry)
     end
 end
 
-local state = {
-    [0] = "The client is disconnected",
-    [1] = "The client has sent HELLO and waiting",
-    [2] = "A TCP connection to the server is open",
-    [3] = "A secureChannel to the server is open",
-    [4] = "A session with the server is open",
-    [5] = "A session with the server is disconnected",
-    [6] = "A session with the server is open (renewed)"
+local function write_boolean(cli, id, dt, val)
+    if id then
+        if type(val) == "boolean" then
+            return cli:write_boolean(id, dt, val)
+        else
+            return false, errinfo.invalid_datatype
+        end
+    else
+        return false, errinfo.not_registered
+    end
+end
+
+local function write_integer(cli, id, dt, val)
+    if id then
+        if math.tointeger(val) then
+            return cli:write_integer(id, dt, val)
+        else
+            return false, errinfo.invalid_datatype
+        end
+    else
+        return false, errinfo.not_registered
+    end
+end
+
+local function write_double(cli, id, dt, val)
+    if id then
+        if type(val) == "number" then
+            return cli:write_double(id, dt, val)
+        else
+            return false, errinfo.invalid_datatype
+        end
+    else
+        return false, errinfo.not_registered
+    end
+end
+
+local function write_string(cli, id, dt, val)
+    if id then
+        if type(val) == "string" then
+            return cli:write_string(id, dt, val)
+        else
+            return false, errinfo.invalid_datatype
+        end
+    else
+        return false, errinfo.not_registered
+    end
+end
+
+local dt_map = {
+    [0] = write_boolean,
+    [1] = write_integer,
+    [2] = write_integer,
+    [3] = write_integer,
+    [4] = write_integer,
+    [5] = write_integer,
+    [6] = write_integer,
+    [7] = write_integer,
+    [8] = write_integer,
+    [9] = write_double,
+    [10] = write_double,
+    [11] = write_string,
 }
 
 local cli = {}
@@ -79,7 +147,12 @@ function cli:read(nodelist)
 end
 
 function cli:write(node, val)
-    return self.__client:write(node.id, node.dtidx, val)
+    local f = dt_map[node.dtidx]
+    if f then
+        return f(self.__client, node.id, node.dtidx, val)
+    else
+        return errinfo.invalid_datatype
+    end
 end
 
 function cli:connect()
