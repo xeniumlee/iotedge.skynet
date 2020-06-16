@@ -92,7 +92,7 @@ local function do_write(dev, tag, value)
     local t = devlist[dev].tags[tag]
     assert(t.mode == "ctrl", daqtxt.read_only)
 
-    local ok, ret = cli:write(t.id, t.dtidx, value)
+    local ok, ret = cli:write(t, value)
     assert(ok, strfmt("%s:%s", daqtxt.req_fail, ret))
 
     log.info(daqtxt.write_suc, dev, tag, tostring(value))
@@ -219,15 +219,12 @@ local function make_polls(dname, taglist, polls)
     end
 end
 
-local function fill_tag(t, name, id, dtidx, dtname, dev)
+local function fill_tag(t, name, ts_poll, attr_poll)
     t.name = name
-    t.id = id
-    t.dtidx = dtidx
-    t.dtname = dtname
     if t.mode == "ts" then
-        t.poll = t.poll or dev.ts_poll
+        t.poll = t.poll or ts_poll
     elseif t.mode == "attr" then
-        t.poll = t.poll or dev.attr_poll
+        t.poll = t.poll or attr_poll
     end
 end
 
@@ -252,6 +249,7 @@ local function validate_tags(dev)
     local max_poll = 0
     for name, t in pairs(dev.tags) do
         assert(type(name)=="string", daqtxt.invalid_tag_conf)
+
         local ok = pcall(validator.check, t, tag_schema)
         assert(ok, daqtxt.invalid_tag_conf)
 
@@ -259,10 +257,11 @@ local function validate_tags(dev)
             assert(t.dt ~= "string" and t.dt ~= "bool", daqtxt.invalid_tag_conf)
         end
 
-        local id, dtidx, dtname
-        ok, id, dtidx, dtname = cli:register(t.node)
-        assert(ok, id)
-        fill_tag(t, name, id, dtidx, dtname, dev)
+        local err
+        ok, err = cli:register(t)
+        assert(ok, err)
+
+        fill_tag(t, name, dev.ts_poll, dev.attr_poll)
 
         if t.mode ~= "ctrl" then
             if t.poll > max_poll then
@@ -366,17 +365,13 @@ local t_schema = {
     model = validator.vals("S7_PLC_1200_1500")
 }
 
-local function state_changed(state)
-    log.info(opcuatxt.state_changed, cli:state(state))
-end
-
 local function config_transport(t)
     local ok = pcall(validator.check, t, t_schema)
     if not ok then
         return ok
     else
         stop()
-        ok, cli = pcall(client.new, t, state_changed)
+        ok, cli = pcall(client.new, t)
         if ok then
             return cli:connect()
         else
