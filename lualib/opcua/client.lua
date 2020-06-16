@@ -85,6 +85,18 @@ local function write_integer(cli, id, dt, val)
     end
 end
 
+local function write_float(cli, id, dt, val)
+    if id then
+        if type(val) == "number" then
+            return cli:write_float(id, dt, val)
+        else
+            return false, errinfo.invalid_datatype
+        end
+    else
+        return false, errinfo.not_registered
+    end
+end
+
 local function write_double(cli, id, dt, val)
     if id then
         if type(val) == "number" then
@@ -119,7 +131,7 @@ local dt_map = {
     [6] = write_integer,
     [7] = write_integer,
     [8] = write_integer,
-    [9] = write_double,
+    [9] = write_float,
     [10] = write_double,
     [11] = write_string,
 }

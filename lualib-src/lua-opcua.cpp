@@ -279,6 +279,10 @@ namespace opcua {
             return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&Val), L);
         }
 
+        auto WriteFloat(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, UA_Float Val, sol::this_state L) {
+            return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&Val), L);
+        }
+
         auto WriteString(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, const std::string& Val, sol::this_state L) {
             UA_String str = UA_STRING(const_cast<char*>(Val.data()));
             return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&str), L);
@@ -363,6 +367,7 @@ namespace opcua {
             "read", &Client::Read,
             "write_boolean", &Client::WriteBoolean,
             "write_integer", &Client::WriteInteger,
+            "write_float", &Client::WriteFloat,
             "write_double", &Client::WriteDouble,
             "write_string", &Client::WriteString,
             "register", &Client::Register,
