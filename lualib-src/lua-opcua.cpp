@@ -150,8 +150,6 @@ namespace opcua {
             sol::state_view lua(L);
             sol::table info = lua.create_table();
 
-            info["ns_index"] = _ns;
-            info["state"] = UA_Client_getState(_client);
             UA_ClientConfig *config = UA_Client_getConfig(_client);
             info["timeout"] = config->timeout;
             info["securechannel_lifetime"] = config->secureChannelLifeTime;

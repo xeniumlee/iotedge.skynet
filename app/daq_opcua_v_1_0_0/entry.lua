@@ -219,15 +219,6 @@ local function make_polls(dname, taglist, polls)
     end
 end
 
-local function fill_tag(t, name, ts_poll, attr_poll)
-    t.name = name
-    if t.mode == "ts" then
-        t.poll = t.poll or ts_poll
-    elseif t.mode == "attr" then
-        t.poll = t.poll or attr_poll
-    end
-end
-
 local tag_schema = {
     mode = validator.vals("ts", "attr", "ctrl"),
     node = validator.string,
@@ -247,6 +238,8 @@ local tag_schema = {
 
 local function validate_tags(dev)
     local max_poll = 0
+    local ts_poll = dev.ts_poll
+    local attr_poll = dev.attr_poll
     for name, t in pairs(dev.tags) do
         assert(type(name)=="string", daqtxt.invalid_tag_conf)
 
@@ -258,12 +251,17 @@ local function validate_tags(dev)
         end
 
         local err
+        t.name = name
         ok, err = cli:register(t)
         assert(ok, err)
 
-        fill_tag(t, name, dev.ts_poll, dev.attr_poll)
-
-        if t.mode ~= "ctrl" then
+        if t.mode == "ts" then
+            t.poll = t.poll or ts_poll
+            if t.poll > max_poll then
+                max_poll = t.poll
+            end
+        elseif t.mode == "attr" then
+            t.poll = t.poll or attr_poll
             if t.poll > max_poll then
                 max_poll = t.poll
             end
