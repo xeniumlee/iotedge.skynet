@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local opcua = require "opcua"
 
-local state = {
+local state_map = {
     [0] = "The client is disconnected",
     [1] = "The client has sent HELLO and waiting",
     [2] = "A TCP connection to the server is open",
@@ -19,7 +19,7 @@ local errinfo = {
 local function do_connect(self)
     local ok, err
     if self.__username ~= '' and self.__password ~= '' then
-        ok, err = self.__client:connect(self.__info.url, self.__info.namespace, self.__username, self.__password)
+        ok, err = self.__client:connect_username(self.__info.url, self.__info.namespace, self.__username, self.__password)
     else
         ok, err = self.__client:connect(self.__info.url, self.__info.namespace)
     end
@@ -138,6 +138,8 @@ local dt_map = {
 
 local cli = {}
 function cli:info()
+    local s = self.__client:state()
+    self.__info.state = state_map[s]
     return self.__info
 end
 
@@ -191,31 +193,20 @@ local client = {}
 function client.new(desc)
     assert(desc.url and desc.namespace)
 
-    local self
-    local function state_changed(s)
-        self.__info.state = state[s]
-        skynet.error("opcua: state changed", self.__info.state)
-        if s == 0 then
-            skynet.timeout(0, function() try_connect(self, true) end)
-        end
-    end
-
-    local c = assert(opcua.client.new(state_changed))
-    local info = c:info()
-
-    self = setmetatable({
-        __client = c,
-        __info = info,
+    local opcua_c = assert(opcua.client.new())
+    local c = setmetatable({
+        __client = opcua_c,
         __username = desc.username,
         __password = desc.password,
         __closed = true,
         __nodelist = {}
     }, client_meta)
 
-    self.__info.url = desc.url
-    self.__info.namespace = desc.namespace
+    c.__info = opcua_c:configuration()
+    c.__info.url = desc.url
+    c.__info.namespace = desc.namespace
 
-    return self
+    return c
 end
 
 return client

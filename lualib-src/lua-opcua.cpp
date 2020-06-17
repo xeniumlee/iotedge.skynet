@@ -22,7 +22,6 @@ namespace opcua {
 	R.push_back({ L, sol::in_place_type<std::string>, E }); \
 }
 
-    void stateCallback(UA_Client*, UA_ClientState);
     const size_t maxRead = 200;
     const std::string err_not_supported = "Not supported data type";
 
@@ -30,7 +29,6 @@ namespace opcua {
     private:
         UA_Client* _client;
         UA_Int16 _ns = -1;
-        sol::function _cb;
 
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
@@ -41,6 +39,11 @@ namespace opcua {
                 _ns = idx;
             }
             return code;
+        }
+
+        auto setUserTokenPolicy(UA_UserTokenType Type) {
+            UA_ClientConfig *config = UA_Client_getConfig(_client);
+            config->userTokenPolicy.tokenType = Type;
         }
 
         auto getNodeType(const UA_NodeId& NodeId) {
@@ -79,14 +82,12 @@ namespace opcua {
         }
 
     public:
-        Client(sol::function StateCB) : _cb(StateCB) {
+        Client() {
             _client = UA_Client_new();
             UA_ClientConfig *config = UA_Client_getConfig(_client);
             UA_ClientConfig_setDefault(config);
-            config->stateCallback = stateCallback;
             config->logger.log = NULL;
             config->logger.clear = NULL;
-            config->clientContext = static_cast<void*>(this);
         }
 
         ~Client() {
@@ -94,12 +95,10 @@ namespace opcua {
             UA_Client_delete(_client);
         }
 
-        auto CallStateCB(UA_ClientState clientState) {
-            _cb(clientState);
-        }
-
         auto Connect(const std::string& EndpointUrl, const std::string& Namespace,
                 sol::this_state L) {
+            setUserTokenPolicy(UA_USERTOKENTYPE_ANONYMOUS);
+
             sol::variadic_results ret;
             UA_StatusCode code = UA_Client_connect(_client, EndpointUrl.data());
             if (code == UA_STATUSCODE_GOOD) {
@@ -119,6 +118,8 @@ namespace opcua {
         auto ConnectUsername(const std::string& EndpointUrl, const std::string& Namespace,
                 const std::string& Username, const std::string& Password,
                 sol::this_state L) {
+            setUserTokenPolicy(UA_USERTOKENTYPE_USERNAME);
+
             sol::variadic_results ret;
             UA_StatusCode code =  UA_Client_connect_username(_client, EndpointUrl.data(), Username.data(), Password.data());
             if (code == UA_STATUSCODE_GOOD) {
@@ -146,17 +147,21 @@ namespace opcua {
             return ret;
         }
 
-        auto Info(sol::this_state L) {
+        auto Configuration(sol::this_state L) {
             sol::state_view lua(L);
-            sol::table info = lua.create_table();
+            sol::table c = lua.create_table();
 
             UA_ClientConfig *config = UA_Client_getConfig(_client);
-            info["timeout"] = config->timeout;
-            info["securechannel_lifetime"] = config->secureChannelLifeTime;
-            info["requestedsession_timeout"] = config->requestedSessionTimeout;
-            info["connectivity_checkInterval"] = config->connectivityCheckInterval;
+            c["timeout"] = config->timeout;
+            c["securechannel_lifetime"] = config->secureChannelLifeTime;
+            c["requestedsession_timeout"] = config->requestedSessionTimeout;
+            c["connectivity_checkInterval"] = config->connectivityCheckInterval;
 
-            return info;
+            return c;
+        }
+
+        auto State() {
+            return UA_Client_getState(_client);
         }
 
         auto Read(sol::table NodeList, sol::this_state L) {
@@ -350,19 +355,13 @@ namespace opcua {
         }
     };
 
-    void stateCallback(UA_Client *client, UA_ClientState clientState) {
-        Client* cli = static_cast<Client*>(UA_Client_getContext(client));
-        cli->CallStateCB(clientState);
-    }
-
     sol::table open(sol::this_state L) {
         sol::state_view lua(L);
         sol::table module = lua.create_table();
 
         module.new_usertype<Client>("client",
-            sol::constructors<Client(sol::function)>(),
-            "connect", sol::overload(&Client::Connect,
-                                     &Client::ConnectUsername),
+            "connect", &Client::Connect,
+            "connect_username", &Client::ConnectUsername,
             "disconnect", &Client::Disconnect,
             "read", &Client::Read,
             "write_boolean", &Client::WriteBoolean,
@@ -372,7 +371,8 @@ namespace opcua {
             "write_string", &Client::WriteString,
             "register", &Client::Register,
             "unregister", &Client::UnRegister,
-            "info", &Client::Info
+            "configuration", &Client::Configuration,
+            "state", &Client::State
         );
         return module;
     }
