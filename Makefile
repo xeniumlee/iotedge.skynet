@@ -54,8 +54,8 @@ LUA_SNAP7_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXXF
 $(LUA_SNAP7_BIN): $(LUA_SNAP7_SRC) $(SNAP7_SRC)/snap7.cpp $(SNAP7_BIN)
 	$(LUA_SNAP7_CXX) $^ -o $@ -I$(LUA_SRC) -I$(SNAP7_SRC) -I$(SKYNET_SRC) -lpthread -lrt
 
-OPEN62541_BIN = $(PREBUILT_PATH)/libopen62541.a.1.0.1
-OPEN62541_SRC = 3rd/open62541-1.0.1
+OPEN62541_BIN = $(PREBUILT_PATH)/libopen62541.a.1.1
+OPEN62541_SRC = 3rd/open62541-1.1
 LUA_OPCUA_BIN = $(BUILD_PATH)/opcua.so
 LUA_OPCUA_SRC = $(LUA_LIB_SRC)/lua-opcua.cpp
 LUA_OPCUA_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXXFLAGS)

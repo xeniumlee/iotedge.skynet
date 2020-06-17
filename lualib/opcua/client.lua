@@ -1,14 +1,24 @@
 local skynet = require "skynet"
 local opcua = require "opcua"
 
-local state_map = {
-    [0] = "The client is disconnected",
-    [1] = "The client has sent HELLO and waiting",
-    [2] = "A TCP connection to the server is open",
-    [3] = "A secureChannel to the server is open",
-    [4] = "A session with the server is open",
-    [5] = "A session with the server is disconnected",
-    [6] = "A session with the server is open (renewed)"
+local session_state = {
+    [0] = "Closed",
+    [1] = "Create requested",
+    [2] = "Created",
+    [3] = "Activate requested",
+    [4] = "Activated",
+    [5] = "Closing"
+}
+
+local channel_state = {
+    [0] = "Closed",
+    [1] = "Hello sent",
+    [2] = "Hello received",
+    [3] = "Ack sent",
+    [4] = "Ack received",
+    [5] = "Open sent",
+    [6] = "Open",
+    [7] = "Closing"
 }
 
 local errinfo = {
@@ -138,8 +148,10 @@ local dt_map = {
 
 local cli = {}
 function cli:info()
-    local s = self.__client:state()
-    self.__info.state = state_map[s]
+    local s1, s2, s3 = self.__client:state()
+    self.__info.state.connection = s3
+    self.__info.state.channel = channel_state[s1]
+    self.__info.state.session = session_state[s2]
     return self.__info
 end
 
@@ -194,19 +206,20 @@ function client.new(desc)
     assert(desc.url and desc.namespace)
 
     local opcua_c = assert(opcua.client.new())
-    local c = setmetatable({
+    local config = opcua_c:configuration()
+    return setmetatable({
         __client = opcua_c,
         __username = desc.username,
         __password = desc.password,
         __closed = true,
-        __nodelist = {}
+        __nodelist = {},
+        __info = {
+            state = {},
+            config = config,
+            url = desc.url,
+            namespace = desc.namespace
+        }
     }, client_meta)
-
-    c.__info = opcua_c:configuration()
-    c.__info.url = desc.url
-    c.__info.namespace = desc.namespace
-
-    return c
 end
 
 return client

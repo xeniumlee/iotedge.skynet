@@ -23,7 +23,7 @@ namespace opcua {
 }
 
     const size_t maxRead = 200;
-    const std::string err_not_supported = "Not supported data type";
+    const std::string errNotSupported = "Not supported data type";
 
     class Client {
     private:
@@ -43,6 +43,12 @@ namespace opcua {
 
         auto setUserTokenPolicy(UA_UserTokenType Type) {
             UA_ClientConfig *config = UA_Client_getConfig(_client);
+            /*if (Type == UA_USERTOKENTYPE_ANONYMOUS)
+                config->userTokenPolicy.policyId = anonymousPolicyId;
+            else if (Type == UA_USERTOKENTYPE_USERNAME)
+                config->userTokenPolicy.policyId = usernamePolicyId;
+                */
+
             config->userTokenPolicy.tokenType = Type;
         }
 
@@ -76,7 +82,7 @@ namespace opcua {
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, err_not_supported)
+                RETURN_ERROR(ret, errNotSupported)
             }
             return ret;
         }
@@ -86,8 +92,8 @@ namespace opcua {
             _client = UA_Client_new();
             UA_ClientConfig *config = UA_Client_getConfig(_client);
             UA_ClientConfig_setDefault(config);
-            config->logger.log = NULL;
-            config->logger.clear = NULL;
+            //config->logger.log = NULL;
+            //config->logger.clear = NULL;
         }
 
         ~Client() {
@@ -121,7 +127,7 @@ namespace opcua {
             setUserTokenPolicy(UA_USERTOKENTYPE_USERNAME);
 
             sol::variadic_results ret;
-            UA_StatusCode code =  UA_Client_connect_username(_client, EndpointUrl.data(), Username.data(), Password.data());
+            UA_StatusCode code =  UA_Client_connectUsername(_client, EndpointUrl.data(), Username.data(), Password.data());
             if (code == UA_STATUSCODE_GOOD) {
                 code = setNamespaceIndex(Namespace);
                 if (code == UA_STATUSCODE_GOOD) {
@@ -161,7 +167,11 @@ namespace opcua {
         }
 
         auto State() {
-            return UA_Client_getState(_client);
+            UA_SecureChannelState s1;
+            UA_SessionState s2;
+            UA_StatusCode s3;
+            UA_Client_getState(_client, &s1, &s2, &s3);
+            return std::make_tuple(s1, s2, std::string(UA_StatusCode_name(s3)));
         }
 
         auto Read(sol::table NodeList, sol::this_state L) {
@@ -259,11 +269,11 @@ namespace opcua {
                                 }
                             default:
                                 NodeList[j]["ok"] = false;
-                                NodeList[j]["val"] = err_not_supported;
+                                NodeList[j]["val"] = errNotSupported;
                         }
                     } else {
                         NodeList[j]["ok"] = false;
-                        NodeList[j]["val"] = err_not_supported;
+                        NodeList[j]["val"] = errNotSupported;
                     }
                 }
             }
@@ -318,7 +328,7 @@ namespace opcua {
                         RETURN_VALUE(ret, std::string, std::string(UA_TYPES[dtidx].typeName))
                     } else {
                         RETURN_VALUE(ret, UA_Int16, dtidx)
-                        RETURN_VALUE(ret, std::string, err_not_supported)
+                        RETURN_VALUE(ret, std::string, errNotSupported)
                     }
 
                 } else {
