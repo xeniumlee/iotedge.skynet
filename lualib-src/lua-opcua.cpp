@@ -1,6 +1,11 @@
 #include "open62541/client_highlevel.h"
 #include "open62541/client_config_default.h"
 
+#include "open62541/plugin/securitypolicy_default.h"
+#include "open62541/plugin/log_stdout.h"
+
+#include "certificates.h"
+
 #define SOL_ALL_SAFETIES_ON 1
 
 #ifdef CXX17
@@ -24,6 +29,8 @@ namespace opcua {
 
     const size_t maxRead = 200;
     const std::string errNotSupported = "Not supported data type";
+    const UA_String nonePolicy = UA_STRING_STATIC("http://opcfoundation.org/UA/SecurityPolicy#None");
+    const UA_String basic128Rsa15Policy = UA_STRING_STATIC("http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15");
 
     class Client {
     private:
@@ -41,15 +48,40 @@ namespace opcua {
             return code;
         }
 
-        auto setUserTokenPolicy(UA_UserTokenType Type) {
+        auto configure(const std::string& EndpointUrl, const UA_String& PolicyUri, UA_UserTokenType Type) {
             UA_ClientConfig *config = UA_Client_getConfig(_client);
-            /*if (Type == UA_USERTOKENTYPE_ANONYMOUS)
-                config->userTokenPolicy.policyId = anonymousPolicyId;
-            else if (Type == UA_USERTOKENTYPE_USERNAME)
-                config->userTokenPolicy.policyId = usernamePolicyId;
-                */
 
-            config->userTokenPolicy.tokenType = Type;
+            size_t s = 0;
+            UA_EndpointDescription* endpoints = NULL;
+            UA_StatusCode code =  UA_Client_getEndpoints(_client, EndpointUrl.data(), &s, &endpoints);
+            if (code == UA_STATUSCODE_GOOD) {
+                for(size_t i=0; i!=s; i++) {
+
+                    const UA_EndpointDescription& e = endpoints[i];
+
+                    if (UA_String_equal(&e.securityPolicyUri, &PolicyUri)) {
+
+                        UA_String_copy(&e.securityPolicyUri, &config->endpoint.securityPolicyUri);
+                        UA_String_copy(&e.serverCertificate, &config->endpoint.serverCertificate);
+                        UA_ApplicationDescription_copy(&e.server, &config->endpoint.server);
+
+                        for(size_t j=0; j!=e.userIdentityTokensSize; j++) {
+                            const UA_UserTokenPolicy& p = e.userIdentityTokens[j];
+                            if (p.tokenType == Type) {
+                                UA_UserTokenPolicy_copy(&p, &config->userTokenPolicy);
+                                goto DONE;
+                            }
+                        }
+                    }
+                }
+            }
+DONE:
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.securityPolicyUri.data);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.server.applicationUri.data);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%zu", config->endpoint.serverCertificate.length);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->userTokenPolicy.securityPolicyUri.data);
+
+            UA_Array_delete(endpoints, s, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
         }
 
         auto getNodeType(const UA_NodeId& NodeId) {
@@ -90,10 +122,27 @@ namespace opcua {
     public:
         Client() {
             _client = UA_Client_new();
+
             UA_ClientConfig *config = UA_Client_getConfig(_client);
-            UA_ClientConfig_setDefault(config);
-            //config->logger.log = NULL;
-            //config->logger.clear = NULL;
+
+            UA_ByteString *trustList = NULL;
+            size_t trustListSize = 0;
+            UA_ByteString *revocationList = NULL;
+            size_t revocationListSize = 0;
+
+            UA_ByteString certificate;
+            certificate.length = CERT_DER_LENGTH;
+            certificate.data = CERT_DER_DATA;
+
+            UA_ByteString privateKey;
+            privateKey.length = KEY_DER_LENGTH;
+            privateKey.data = KEY_DER_DATA;
+
+            UA_ClientConfig_setDefaultEncryption(
+                    config, certificate, privateKey, trustList, trustListSize, revocationList, revocationListSize);
+
+            config->logger.log = NULL;
+            config->logger.clear = NULL;
         }
 
         ~Client() {
@@ -103,7 +152,8 @@ namespace opcua {
 
         auto Connect(const std::string& EndpointUrl, const std::string& Namespace,
                 sol::this_state L) {
-            setUserTokenPolicy(UA_USERTOKENTYPE_ANONYMOUS);
+
+            configure(EndpointUrl, nonePolicy, UA_USERTOKENTYPE_ANONYMOUS);
 
             sol::variadic_results ret;
             UA_StatusCode code = UA_Client_connect(_client, EndpointUrl.data());
@@ -124,7 +174,8 @@ namespace opcua {
         auto ConnectUsername(const std::string& EndpointUrl, const std::string& Namespace,
                 const std::string& Username, const std::string& Password,
                 sol::this_state L) {
-            setUserTokenPolicy(UA_USERTOKENTYPE_USERNAME);
+
+            configure(EndpointUrl, nonePolicy, UA_USERTOKENTYPE_USERNAME);
 
             sol::variadic_results ret;
             UA_StatusCode code =  UA_Client_connectUsername(_client, EndpointUrl.data(), Username.data(), Password.data());
