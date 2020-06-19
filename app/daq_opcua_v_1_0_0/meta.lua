@@ -1,6 +1,8 @@
 conf = {
     transport = {
         url = '',
+        security_mode = 'none', -- "sign" "signandencrypt"
+        security_policy = 'none', -- "basic128rsa15" "basic256" "basic256sha256"
         namespace = '',
         username = '',
         password = '',

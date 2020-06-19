@@ -21,6 +21,20 @@ local channel_state = {
     [7] = "Closing"
 }
 
+local security_policy_prefix = "http://opcfoundation.org/UA/SecurityPolicy#"
+local security_policy = {
+    none = security_policy_prefix.."None",
+    basic128rsa15 = security_policy_prefix.."Basic128Rsa15",
+    basic256 = security_policy_prefix.."Basic256",
+    basic256sha256 = security_policy_prefix.."Basic256Sha256"
+}
+
+local security_mode = {
+    none = 1,
+    sign = 2,
+    signandencrypt = 3
+}
+
 local errinfo = {
     not_registered = "node not registered",
     invalid_datatype = "invalid datatype"
@@ -41,15 +55,15 @@ end
 local function do_connect(self)
     local ok, err
     if self.__username ~= '' and self.__password ~= '' then
-        ok, err = self.__client:connect_username(self.__info.url, self.__info.namespace, self.__username, self.__password)
+        ok, err = self.__client:connect_username(self.__config.url, self.__config.namespace, self.__username, self.__password)
     else
-        ok, err = self.__client:connect(self.__info.url, self.__info.namespace)
+        ok, err = self.__client:connect(self.__config.url, self.__config.namespace)
     end
 
     if ok then
-        skynet.error("opcua: connected to", self.__info.url, self.__info.namespace)
+        skynet.error("opcua: connected to", self.__config.url, self.__config.namespace)
     else
-        skynet.error("opcua: connect failed", self.__info.url, self.__info.namespace, err)
+        skynet.error("opcua: connect failed", self.__config.url, self.__config.namespace, err)
     end
     return ok
 end
@@ -161,10 +175,10 @@ local dt_map = {
 local cli = {}
 function cli:info()
     local s1, s2, s3 = self.__client:state()
-    self.__info.state.connection = s3
-    self.__info.state.channel = channel_state[s1]
-    self.__info.state.session = session_state[s2]
-    return self.__info
+    self.__state.connection = s3
+    self.__state.channel = channel_state[s1]
+    self.__state.session = session_state[s2]
+    return { state = self.__state, config = self.__config }
 end
 
 function cli:register(node)
@@ -202,9 +216,9 @@ function cli:close()
     self.__closed = true
     local ok, err = self.__client:disconnect()
     if ok then
-        skynet.error("opcua: disconnected", self.__info.url, self.__info.namespace)
+        skynet.error("opcua: disconnected", self.__config.url, self.__config.namespace)
     else
-        skynet.error("opcua: disconnect failed", self.__info.url, self.__info.namespace, err)
+        skynet.error("opcua: disconnect failed", self.__config.url, self.__config.namespace, err)
     end
     return ok
 end
@@ -220,20 +234,24 @@ function client.new(desc)
     local c = assert(read_file(cert))
     local k = assert(read_file(key))
 
-    local opcua_c = assert(opcua.client.new(uri, c, k))
+    local s_mode = assert(security_mode[desc.security_mode])
+    local s_policy = assert(security_policy[desc.security_policy])
+
+    local opcua_c = assert(opcua.client.new(uri, s_mode, s_policy, c, k))
     local config = opcua_c:configuration()
+    config.security_mode = desc.security_mode
+    config.security_policy = desc.security_policy
+    config.url = desc.url
+    config.namespace = desc.namespace
+
     return setmetatable({
         __client = opcua_c,
         __username = desc.username,
         __password = desc.password,
         __closed = true,
         __nodelist = {},
-        __info = {
-            state = {},
-            config = config,
-            url = desc.url,
-            namespace = desc.namespace
-        }
+        __state = {},
+        __config = config,
     }, client_meta)
 end
 

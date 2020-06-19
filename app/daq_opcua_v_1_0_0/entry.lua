@@ -1,6 +1,5 @@
 local skynet = require "skynet"
 local log = require "log"
-local opcuatxt = require("text").opcua
 local daqtxt = require("text").daq
 local api = require "api"
 local validator = require "utils.validator"
@@ -360,7 +359,9 @@ local t_schema = {
     password = function(v)
         return v=='' or validator.string(v)
     end,
-    model = validator.vals("S7_PLC_1200_1500")
+    model = validator.vals("S7_PLC_1200_1500"),
+    security_mode = validator.vals("none", "sign", "signandencrypt"),
+    security_policy = validator.vals("none", "basic128rsa15", "basic256", "basic256sha256")
 }
 
 local function config_transport(t)

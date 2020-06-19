@@ -27,7 +27,7 @@ function validator.httpurl(v)
 end
 
 function validator.opcurl(v)
-    return type(v)=="string" and v:match("^opc%.tcp://[%d%.]+:%d+%g*$")
+    return type(v)=="string" and v:match("^opc%.tcp://[%d%.]+:%d+$")
 end
 
 function validator.string(v)
