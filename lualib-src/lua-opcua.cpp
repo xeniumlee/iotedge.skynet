@@ -4,8 +4,6 @@
 #include "open62541/plugin/securitypolicy_default.h"
 #include "open62541/plugin/log_stdout.h"
 
-#include "certificates.h"
-
 #define SOL_ALL_SAFETIES_ON 1
 
 #ifdef CXX17
@@ -40,7 +38,7 @@ namespace opcua {
     private:
         auto setNamespaceIndex(const std::string& Namespace) {
             UA_UInt16 idx;
-            UA_String ns = UA_STRING(const_cast<char*>(Namespace.data()));
+            UA_String ns = UA_STRING_ALLOC(Namespace.data());
             UA_StatusCode code = UA_Client_NamespaceGetIndex(_client, &ns, &idx);
             if (code == UA_STATUSCODE_GOOD) {
                 _ns = idx;
@@ -66,7 +64,9 @@ namespace opcua {
                         UA_ApplicationDescription_copy(&e.server, &config->endpoint.server);
 
                         for(size_t j=0; j!=e.userIdentityTokensSize; j++) {
+
                             const UA_UserTokenPolicy& p = e.userIdentityTokens[j];
+
                             if (p.tokenType == Type) {
                                 UA_UserTokenPolicy_copy(&p, &config->userTokenPolicy);
                                 goto DONE;
@@ -76,8 +76,8 @@ namespace opcua {
                 }
             }
 DONE:
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.securityPolicyUri.data);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.server.applicationUri.data);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.securityPolicyUri.data);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%zu", config->endpoint.serverCertificate.length);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->userTokenPolicy.securityPolicyUri.data);
 
@@ -120,7 +120,7 @@ DONE:
         }
 
     public:
-        Client() {
+        Client(const std::string& ApplicationUri, const std::string& Cert, const std::string& Key) {
             _client = UA_Client_new();
 
             UA_ClientConfig *config = UA_Client_getConfig(_client);
@@ -131,18 +131,21 @@ DONE:
             size_t revocationListSize = 0;
 
             UA_ByteString certificate;
-            certificate.length = CERT_DER_LENGTH;
-            certificate.data = CERT_DER_DATA;
+            certificate.length = Cert.length();
+            certificate.data = (UA_Byte*)Cert.data();
 
             UA_ByteString privateKey;
-            privateKey.length = KEY_DER_LENGTH;
-            privateKey.data = KEY_DER_DATA;
+            privateKey.length = Key.length();
+            privateKey.data = (UA_Byte*)Key.data();
 
             UA_ClientConfig_setDefaultEncryption(
                     config, certificate, privateKey, trustList, trustListSize, revocationList, revocationListSize);
 
-            config->logger.log = NULL;
-            config->logger.clear = NULL;
+            config->clientDescription.applicationUri = UA_STRING_ALLOC(ApplicationUri.data());
+            config->clientDescription.applicationType = UA_APPLICATIONTYPE_CLIENT;
+
+            //config->logger.log = NULL;
+            //config->logger.clear = NULL;
         }
 
         ~Client() {
@@ -209,6 +212,7 @@ DONE:
             sol::table c = lua.create_table();
 
             UA_ClientConfig *config = UA_Client_getConfig(_client);
+            c["application_uri"] = std::string(reinterpret_cast<const char*>(config->clientDescription.applicationUri.data));
             c["timeout"] = config->timeout;
             c["securechannel_lifetime"] = config->secureChannelLifeTime;
             c["requestedsession_timeout"] = config->requestedSessionTimeout;
@@ -350,7 +354,7 @@ DONE:
         }
 
         auto WriteString(UA_UInt32 NodeId, UA_Int16 DataTypeIndex, const std::string& Val, sol::this_state L) {
-            UA_String str = UA_STRING(const_cast<char*>(Val.data()));
+            UA_String str = UA_STRING_ALLOC(Val.data());
             return doWrite(NodeId, DataTypeIndex, static_cast<void*>(&str), L);
         }
 
@@ -358,7 +362,7 @@ DONE:
             UA_RegisterNodesRequest req;
             UA_RegisterNodesRequest_init(&req);
 
-            UA_NodeId id = UA_NODEID_STRING(_ns, const_cast<char*>(NodeId.data()));
+            UA_NodeId id = UA_NODEID_STRING_ALLOC(_ns, NodeId.data());
             req.nodesToRegister = &id;
             req.nodesToRegisterSize = 1;
 
@@ -421,6 +425,7 @@ DONE:
         sol::table module = lua.create_table();
 
         module.new_usertype<Client>("client",
+            sol::constructors<Client(const std::string&, const std::string&, const std::string&)>(),
             "connect", &Client::Connect,
             "connect_username", &Client::ConnectUsername,
             "disconnect", &Client::Disconnect,

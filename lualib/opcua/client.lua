@@ -26,6 +26,18 @@ local errinfo = {
     invalid_datatype = "invalid datatype"
 }
 
+local uri = "urn:iotedge.opcua:client"
+local root = "./lualib/opcua/"
+local cert = root.."client.crt.der"
+local key = root.."client.key.der"
+
+local function read_file(file)
+    local f = io.open(file, "rb")
+    local ret = f:read("a")
+    f:close()
+    return ret
+end
+
 local function do_connect(self)
     local ok, err
     if self.__username ~= '' and self.__password ~= '' then
@@ -205,7 +217,10 @@ local client = {}
 function client.new(desc)
     assert(desc.url and desc.namespace)
 
-    local opcua_c = assert(opcua.client.new())
+    local c = assert(read_file(cert))
+    local k = assert(read_file(key))
+
+    local opcua_c = assert(opcua.client.new(uri, c, k))
     local config = opcua_c:configuration()
     return setmetatable({
         __client = opcua_c,
