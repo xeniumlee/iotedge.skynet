@@ -40,7 +40,7 @@ local errinfo = {
     invalid_datatype = "invalid datatype"
 }
 
-local uri = "urn:iotedge.opcua:client"
+local uri = "urn:iotedge:opcua:opcua-client"
 local root = "./lualib/opcua/"
 local cert = root.."client.crt.der"
 local key = root.."client.key.der"
