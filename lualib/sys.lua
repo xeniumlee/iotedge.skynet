@@ -154,9 +154,14 @@ function sys.stop_svc(svc)
 end
 
 function sys.start_svc(svc)
-    handle_svc("restart", svc)
-    skynet.sleep(20)
-    return handle_svc("status", svc)
+    local ok, ret = handle_svc("status", svc)
+    if ok then
+        return ok, ret
+    else
+        handle_svc("restart", svc)
+        skynet.sleep(20)
+        return handle_svc("status", svc)
+    end
 end
 
 function sys.reload_svc(svc)

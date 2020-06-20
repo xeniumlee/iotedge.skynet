@@ -36,21 +36,27 @@
 * make
 #### Build openssl
 ```
-./config
+https://github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
+./config no-tests
 make
+cp libcrypto.a ../iotedge/bin/prebuilt/libcrypto.a.1.1.1g
+cp libssl.a ../iotedge/bin/prebuilt/libssl.a.1.1.1g
 ```
 #### Build snap7
 ```
-cd build/unix
+cd 3rd/snap7-1.4.2/build/unix
 make -f x86_64_linux.mk clean|all|install
 make -f arm_v7_linux.mk clean|all|install
+cp ../bin/x86_64/libsnap7.a ../../../../bin/prebuilt/libsnap7.a.1.4.2
 ```
 #### Build open62541
 ```
+https://github.com/open62541/open62541/archive/v1.1.tar.gz
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DUA_ENABLE_ENCRYPTION=ON -DUA_ENABLE_ENCRYPTION_OPENSSL=ON -DOPENSSL_CRYPTO_LIBRARY="../../iotedge/bin/prebuilt/libcrypto.a.1.1.1g" -DOPENSSL_SSL_LIBRARY="../../iotedge/bin/prebuilt/libssl.a.1.1.1g" -DOPENSSL_INCLUDE_DIR="../../iotedge/3rd/openssl-1.1.1g" ..
 make
+cp bin/libopen62541.a ../../iotedge/bin/prebuilt/libopen62541.a.1.1
 ```
 ### Run
 * Put necessary dependences into bin/prebuilt
