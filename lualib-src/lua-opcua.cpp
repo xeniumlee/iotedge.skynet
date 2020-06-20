@@ -1,7 +1,6 @@
 #include "open62541/client_highlevel.h"
 #include "open62541/client_config_default.h"
 
-#include "open62541/plugin/securitypolicy_default.h"
 #include "open62541/plugin/log_stdout.h"
 
 #define SOL_ALL_SAFETIES_ON 1
@@ -27,7 +26,6 @@ namespace opcua {
 
     const size_t maxRead = 200;
     const std::string errNotSupportedDataType = "Not supported data type";
-    const std::string errNotSupportedEndpoint = "Not supported endpoint";
 
     class Client {
     private:
@@ -44,45 +42,6 @@ namespace opcua {
                 _ns = idx;
             }
             return code;
-        }
-
-        auto configure(const std::string& EndpointUrl, UA_UserTokenType Type) {
-            UA_ClientConfig *config = UA_Client_getConfig(_client);
-
-            size_t s = 0;
-            UA_EndpointDescription* endpoints = NULL;
-            UA_StatusCode code =  UA_Client_getEndpoints(_client, EndpointUrl.data(), &s, &endpoints);
-            if (code == UA_STATUSCODE_GOOD) {
-                for(size_t i=0; i!=s; i++) {
-
-                    const UA_EndpointDescription& e = endpoints[i];
-                    const UA_EndpointDescription& self = config->endpoint;
-
-                    if (UA_String_equal(&e.securityPolicyUri, &self.securityPolicyUri) &&
-                        e.securityMode == self.securityMode) {
-
-                        UA_String_copy(&e.serverCertificate, &config->endpoint.serverCertificate);
-                        UA_ApplicationDescription_copy(&e.server, &config->endpoint.server);
-
-                        for(size_t j=0; j!=e.userIdentityTokensSize; j++) {
-
-                            const UA_UserTokenPolicy& p = e.userIdentityTokens[j];
-
-                            if (p.tokenType == Type) {
-                                UA_UserTokenPolicy_copy(&p, &config->userTokenPolicy);
-                                goto DONE;
-                            }
-                        }
-                    }
-                }
-            }
-            return false;
-DONE:
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->endpoint.server.applicationUri.data);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", config->userTokenPolicy.securityPolicyUri.data);
-
-            UA_Array_delete(endpoints, s, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
-            return true;
         }
 
         auto getNodeType(const UA_NodeId& NodeId) {
@@ -147,8 +106,8 @@ DONE:
                     config, certificate, privateKey, trustList, trustListSize, revocationList, revocationListSize);
 
             config->clientDescription.applicationUri = UA_STRING_ALLOC(ApplicationUri.data());
-            config->endpoint.securityMode = Mode;
-            config->endpoint.securityPolicyUri = UA_STRING_ALLOC(Policy.data());
+            config->securityMode = Mode;
+            config->securityPolicyUri = UA_STRING_ALLOC(Policy.data());
 
             //config->logger.log = NULL;
             //config->logger.clear = NULL;
@@ -163,21 +122,17 @@ DONE:
                 sol::this_state L) {
             sol::variadic_results ret;
 
-            if (configure(EndpointUrl, UA_USERTOKENTYPE_ANONYMOUS)) {
-                UA_StatusCode code = UA_Client_connect(_client, EndpointUrl.data());
+            UA_StatusCode code = UA_Client_connect(_client, EndpointUrl.data());
+            if (code == UA_STATUSCODE_GOOD) {
+                code = setNamespaceIndex(Namespace);
                 if (code == UA_STATUSCODE_GOOD) {
-                    code = setNamespaceIndex(Namespace);
-                    if (code == UA_STATUSCODE_GOOD) {
-                        RETURN_OK(ret)
-                    } else {
-                        UA_Client_disconnect(_client);
-                        RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
-                    }
+                    RETURN_OK(ret)
                 } else {
+                    UA_Client_disconnect(_client);
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, errNotSupportedEndpoint);
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
             return ret;
         }
@@ -187,21 +142,17 @@ DONE:
                 sol::this_state L) {
             sol::variadic_results ret;
 
-            if (configure(EndpointUrl, UA_USERTOKENTYPE_USERNAME)) {
-                UA_StatusCode code =  UA_Client_connectUsername(_client, EndpointUrl.data(), Username.data(), Password.data());
+            UA_StatusCode code =  UA_Client_connectUsername(_client, EndpointUrl.data(), Username.data(), Password.data());
+            if (code == UA_STATUSCODE_GOOD) {
+                code = setNamespaceIndex(Namespace);
                 if (code == UA_STATUSCODE_GOOD) {
-                    code = setNamespaceIndex(Namespace);
-                    if (code == UA_STATUSCODE_GOOD) {
-                        RETURN_OK(ret)
-                    } else {
-                        UA_Client_disconnect(_client);
-                        RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
-                    }
+                    RETURN_OK(ret)
                 } else {
+                    UA_Client_disconnect(_client);
                     RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
                 }
             } else {
-                RETURN_ERROR(ret, errNotSupportedEndpoint);
+                RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))
             }
             return ret;
         }
