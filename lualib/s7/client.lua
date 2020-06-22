@@ -27,7 +27,7 @@ end
 function channel:read(dataitem)
     local ok, err = self.__client:read(dataitem)
     if not ok then
-        skynet.fork(do_connect, self)
+        skynet.timeout(0, function() do_connect(self) end)
     end
     return ok, err
 end
@@ -35,7 +35,7 @@ end
 function channel:write(dataitem)
     local ok, err = self.__client:write(dataitem)
     if not ok then
-        skynet.fork(do_connect, self)
+        skynet.timeout(0, function() do_connect(self) end)
     end
     return ok, err
 end
@@ -75,7 +75,7 @@ function client.new(desc)
         __arping = "arping -c 3 -q "..desc.host,
         __connecting = false,
     }, client_meta)
-    skynet.fork(do_connect, self)
+    skynet.timeout(0, function() do_connect(self) end)
 
     return self
 end

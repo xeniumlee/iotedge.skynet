@@ -26,6 +26,7 @@ namespace opcua {
 
     const size_t maxRead = 200;
     const std::string errNotSupportedDataType = "Not supported data type";
+    const std::string errExceedReadlimit = "Max read limit exceeded";
 
     class Client {
     private:
@@ -190,7 +191,12 @@ namespace opcua {
         }
 
         auto Read(sol::table NodeList, sol::this_state L) {
+            sol::variadic_results ret;
             size_t count = NodeList.size();
+            if (count > maxRead) {
+                RETURN_ERROR(ret, errExceedReadlimit)
+                return ret;
+            }
 
             UA_ReadValueId ids[maxRead];
             for(size_t i = 0, j = 1; i != count; i++, j++) {
@@ -211,7 +217,6 @@ namespace opcua {
             if (code == UA_STATUSCODE_GOOD && res.resultsSize != count )
                 code = UA_STATUSCODE_BADUNEXPECTEDERROR;
 
-            sol::variadic_results ret;
             if (code != UA_STATUSCODE_GOOD) {
                 UA_ReadResponse_clear(&res);
                 RETURN_ERROR(ret, std::string(UA_StatusCode_name(code)))

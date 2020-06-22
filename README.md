@@ -54,7 +54,7 @@ cp ../bin/x86_64/libsnap7.a ../../../../bin/prebuilt/libsnap7.a.1.4.2
 https://github.com/open62541/open62541/archive/v1.1.tar.gz
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DUA_ENABLE_ENCRYPTION=ON -DUA_ENABLE_ENCRYPTION_OPENSSL=ON -DOPENSSL_CRYPTO_LIBRARY="../../iotedge/bin/prebuilt/libcrypto.a.1.1.1g" -DOPENSSL_SSL_LIBRARY="../../iotedge/bin/prebuilt/libssl.a.1.1.1g" -DOPENSSL_INCLUDE_DIR="../../iotedge/3rd/openssl-1.1.1g" ..
+cmake -DCMAKE_BUILD_TYPE=Release -DUA_ENABLE_ENCRYPTION_OPENSSL=ON -DOPENSSL_CRYPTO_LIBRARY="../../iotedge/bin/prebuilt/libcrypto.a.1.1.1g" -DOPENSSL_SSL_LIBRARY="../../iotedge/bin/prebuilt/libssl.a.1.1.1g" -DOPENSSL_INCLUDE_DIR="../../iotedge/3rd/openssl-1.1.1g" ..
 make
 cp bin/libopen62541.a ../../iotedge/bin/prebuilt/libopen62541.a.1.1
 ```
