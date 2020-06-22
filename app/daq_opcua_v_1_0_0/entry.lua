@@ -48,8 +48,7 @@ function list(dev)
                     h[name] = {
                         mode = t.mode,
                         node = t.node,
-                        dt = t.dtname,
-                        id = t.id
+                        dt = t.dtname
                     }
                 end
                 d.help = h
@@ -359,7 +358,7 @@ local t_schema = {
     password = function(v)
         return v=='' or validator.string(v)
     end,
-    model = validator.vals("S7_PLC_1200_1500"),
+    model = validator.string,
     security_mode = validator.vals("none", "sign", "signandencrypt"),
     security_policy = validator.vals("none", "basic128rsa15", "basic256", "basic256sha256")
 }

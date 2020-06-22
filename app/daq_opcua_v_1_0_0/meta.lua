@@ -6,7 +6,7 @@ conf = {
         namespace = '',
         username = '',
         password = '',
-        model = 'S7_PLC_1200_1500'
+        model = 'S7_PLC_1200_1500' -- any
     },
     devices = {
         d1 = {
