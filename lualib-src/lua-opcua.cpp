@@ -270,7 +270,7 @@ namespace opcua {
                                 break;
                             case UA_TYPES_UINT64:
                                 NodeList[j]["ok"] = true;
-                                NodeList[j]["val"] = *static_cast<UA_UInt64*>(v.data);
+                                NodeList[j]["val"] = *static_cast<UA_Int64*>(v.data);
                                 break;
                             case UA_TYPES_FLOAT:
                                 NodeList[j]["ok"] = true;
