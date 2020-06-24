@@ -27,8 +27,32 @@ namespace python {
     const std::string errInvalidArgs = "Invalid arguments";
     const std::string errFunction = "Err execute function";
 
-    PyObject* convertArg(int64_t v) {
-        return PyLong_FromLong(v);
+    void convertArg(sol::object Obj, PyObject* pObj) {
+        sol::type t = Obj.get_type();
+        switch (t) {
+            case sol::type::boolean:
+                {
+                    pObj = Obj.as<bool>() ? Py_True : Py_False;
+                    break;
+                }
+            case sol::type::string:
+                {
+                    const std::string& v = Obj.as<std::string>();
+                    pObj = PyUnicode_FromStringAndSize(v.data(), v.length());
+                    break;
+                }
+            case sol::type::number:
+                {
+                    if (Obj.is<double>()) {
+                        pObj = PyFloat_FromDouble(Obj.as<double>());
+                    } else {
+                        pObj = PyLong_FromLong(Obj.as<long>());
+                    }
+                    break;
+                }
+            default:
+                break;
+        }
     }
 
     void Init() {
@@ -51,6 +75,7 @@ namespace python {
         }
 
         pName = PyUnicode_DecodeFSDefaultAndSize(Module.data(), Module.length());
+        PyObject_Print(pName, stdout, 0);
         pModule = PyImport_Import(pName);
 
         if (!pModule) {
@@ -66,7 +91,7 @@ namespace python {
 
         pArgs = PyTuple_New(size);
         for(size_t i = 0, j = 1; i != size; i++, j++) {
-            pValue = convertArg(Args[j]);
+            convertArg(Args[j], pValue);
             if (!pValue) {
                 RETURN_ERROR(ret, errInvalidArgs)
                 goto DONE;
@@ -97,7 +122,7 @@ DONE:
         sol::table module = lua.create_table();
 
         module.set_function("init", Init);
-        module.set_function("finalize", Py_FinalizeEx);
+        module.set_function("close", Py_FinalizeEx);
         module.set_function("run", Run);
 
         return module;
