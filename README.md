@@ -9,31 +9,37 @@
 - [x] System/Appliation Upgrade (Remote SW repository)
 - [x] Configuration storage
 - [x] Data storage (Data retention)
-- [x] Json/MessagePack pack 
+- [x] Json/MessagePack pack
 - [x] Zlib compressor
 - [x] COV(change of value) publish
-- [x] Buffer/Group publish 
+- [x] Buffer/Group publish
 - [x] Log rotate
 - [x] Proxy support by FRP
 - [x] Monitor by NodeExporter
-- [x] VPN by OpenVPN
+- [x] VPN by WireGuard
 - [x] Websocket proxy (e.g. for noVNC)
 - [x] Modbus TCP/RTU(ASCII)/RTU(ASCII) over TCP
 - [x] Simens S7
 - [x] Kafka publisher
 - [x] MQTT publisher
 - [x] File publisher
-- [ ] HTTP data acquisition
 - [x] OPCUA: Binding [open62541](https://open62541.org/)
+- [x] Python runtime
+- [ ] HTTP data acquisition
 - [ ] BACnet: Binding [bacnet-stack](http://bacnet.sourceforge.net/)
 ## Build & Run
 ### Build
 * git clone https://github.com/cloudwu/skynet.git
 * mkdir -p bin/prebuilt
-* Build 3rd/openssl-1.1.1g into bin/prebuilt
-* Build 3rd/open62541-1.1 into bin/prebuilt
-* Build 3rd/snap7-1.4.2 into bin/prebuilt
+* build dependencies
 * make
+#### Build python
+```
+https://www.python.org/ftp/python/3.8.3/Python-3.8.3.tgz
+./configure --enable-shared
+make
+cp libpython3.8.a ../iotedge/bin/prebuilt/libpython.a.3.8
+```
 #### Build openssl
 ```
 https://github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
@@ -59,7 +65,6 @@ make
 cp bin/libopen62541.a ../../iotedge/bin/prebuilt/libopen62541.a.1.1
 ```
 ### Run
-* Put necessary dependences into bin/prebuilt
 * cp config.xx config
 * Edit config
 * ./bin/skynet iotedge.config

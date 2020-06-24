@@ -70,9 +70,19 @@ LUA_SERIAL_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXX
 $(LUA_SERIAL_BIN): $(LUA_SERIAL_SRC)
 	$(LUA_SERIAL_CXX) $^ -o $@ -I$(LUA_SRC)
 
-all: skynet $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
+# ./python-config --cflags
+# ./python-config --ldflags
+PYTHON_BIN = $(PREBUILT_PATH)/libpython.a.3.8
+PYTHON_SRC = 3rd/python-3.8
+LUA_PYTHON_BIN = $(BUILD_PATH)/python.so
+LUA_PYTHON_SRC = $(LUA_LIB_SRC)/lua-python.cpp
+LUA_PYTHON_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXXFLAGS) -DNDEBUG
+$(LUA_PYTHON_BIN): $(LUA_PYTHON_SRC) $(PYTHON_BIN)
+	$(LUA_PYTHON_CXX) $^ -o $@ -I$(LUA_SRC) -I$(PYTHON_SRC) -pthread -lcrypt -ldl -lutil -lm
+
+all: skynet $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
 
 clean:
-	rm -f $(LUA_SNAP7_BIN) $(LUA_TLS_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
+	rm -f $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
 
 cleanall: skynetclean clean
