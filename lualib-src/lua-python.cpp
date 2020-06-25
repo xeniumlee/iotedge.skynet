@@ -27,37 +27,39 @@ namespace python {
     const std::string errInvalidArgs = "Invalid arguments";
     const std::string errFunction = "Err execute function";
 
-    void convertArg(sol::object Obj, PyObject* pObj) {
+    PyObject* convertArg(const sol::object& Obj) {
         sol::type t = Obj.get_type();
         switch (t) {
             case sol::type::boolean:
                 {
-                    pObj = Obj.as<bool>() ? Py_True : Py_False;
-                    break;
+                    return Obj.as<bool>() ? Py_True : Py_False;
                 }
             case sol::type::string:
                 {
                     const std::string& v = Obj.as<std::string>();
-                    pObj = PyUnicode_FromStringAndSize(v.data(), v.length());
-                    break;
+                    return PyUnicode_FromStringAndSize(v.data(), v.length());
                 }
             case sol::type::number:
                 {
-                    if (Obj.is<double>()) {
-                        pObj = PyFloat_FromDouble(Obj.as<double>());
-                    } else {
-                        pObj = PyLong_FromLong(Obj.as<long>());
-                    }
-                    break;
+                    //if (Obj.is<double>())
+                    //    return PyFloat_FromDouble(Obj.as<double>());
+                    //else
+                        return PyLong_FromLong(Obj.as<long>());
                 }
             default:
-                break;
+                return NULL;
         }
     }
 
-    void Init() {
-        if (!Py_IsInitialized())
-            Py_Initialize();
+    void Init(const std::string& Path) {
+        if (Py_IsInitialized())
+            Py_FinalizeEx();
+
+        wchar_t* path = Py_DecodeLocale(Path.data(), NULL);
+        Py_SetPath(path);
+        PyMem_RawFree(path);
+
+        Py_Initialize();
     }
 
     auto Run(const std::string& Module,
@@ -75,7 +77,6 @@ namespace python {
         }
 
         pName = PyUnicode_DecodeFSDefaultAndSize(Module.data(), Module.length());
-        PyObject_Print(pName, stdout, 0);
         pModule = PyImport_Import(pName);
 
         if (!pModule) {
@@ -91,7 +92,7 @@ namespace python {
 
         pArgs = PyTuple_New(size);
         for(size_t i = 0, j = 1; i != size; i++, j++) {
-            convertArg(Args[j], pValue);
+            pValue = convertArg(Args[j]);
             if (!pValue) {
                 RETURN_ERROR(ret, errInvalidArgs)
                 goto DONE;

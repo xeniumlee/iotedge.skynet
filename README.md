@@ -35,6 +35,7 @@
 * make
 #### Build python
 ```
+apt-get install libbz2-dev liblzma-dev zlib1g-dev libffi-dev
 https://www.python.org/ftp/python/3.8.3/Python-3.8.3.tgz
 ./configure --enable-shared
 make
