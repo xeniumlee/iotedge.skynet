@@ -70,7 +70,7 @@ local function ensure_subscribe(cli, topic, qos)
             skynet.sleep(sub_retry_timeout)
         else
             log.error(log_prefix, text.sub_fail, topic)
-            done = true
+            break
         end
     end
 end
@@ -116,7 +116,7 @@ local function ensure_publish(cli, msg, dev)
             else
                 log.error(log_prefix, text.pub_fail, msg.topic)
             end
-            done = true
+            break
         end
     end
 end
