@@ -24,10 +24,10 @@ if [ ${CONFIG} = "config.tb" ]; then
         echo "$0 <config> <host> <name> <token> <uri>"
         exit 1
     fi
-    sed -i "s|SYS_ID|${NAME}|; \
-            s|SYS_VERSION|${REV}|; \
+    sed -i "s|SYS_VERSION|${REV}|; \
             s|SYS_PLAT|${PLAT}|; \
             s|SYS_HOST|${HOST}|; \
+            s|SYS_ID|${NAME}|; \
             s|MQTT_ID|${NAME}|; \
             s|MQTT_USERNAME|${TOKEN}|; \
             s|MQTT_URI|${URI}|" ${CONFIG}
@@ -35,7 +35,6 @@ elif [ ${CONFIG} = "config.local" ]; then
     sed -i "s|SYS_VERSION|${REV}|; \
             s|SYS_PLAT|${PLAT}|" ${CONFIG}
 fi
-
 
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
@@ -51,9 +50,9 @@ FRP_SERVICE=frpc.service
 VPN_SERVICE=vpn.service
 
 install ./scripts/iotedge.service ${CORE_SERVICE}
-install ./app/host/${NODE_SERVICE} ${NODE_SERVICE}
-install ./app/frp/${FRP_SERVICE} ${FRP_SERVICE}
-install ./app/vpn/${VPN_SERVICE} ${VPN_SERVICE}
+install ./sys/host/${NODE_SERVICE} ${NODE_SERVICE}
+install ./sys/frp/${FRP_SERVICE} ${FRP_SERVICE}
+install ./sys/vpn/${VPN_SERVICE} ${VPN_SERVICE}
 
 systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}

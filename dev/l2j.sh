@@ -3,7 +3,7 @@
 ROOT=$(dirname $0)/..
 LUA=${ROOT}/skynet/3rd/lua/lua
 
-STAT="package.cpath = \"${ROOT}/bin/?.so;${ROOT}/bin/prebuilt/?.so\" \
+STAT="package.cpath = '${ROOT}/bin/?.so;${ROOT}/bin/prebuilt/?.so' \
       local cjson = require 'cjson' \
       local env = {} \
       loadfile('$1', 't', env)() \

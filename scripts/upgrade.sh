@@ -7,19 +7,45 @@ PORT=$3
 
 REVPLAT=$(cat PLATFORM)
 REV=${REVPLAT%-*}
-
-cp -f $DIR/${CONFIG} ./
-cp -rf $DIR/db ./
+PLAT=${REVPLAT#*-}
 
 mkdir -p ./run
 rm -f ./run/*
-if [ -f $DIR/run/frpc.ini ]; then
-    cp -f $DIR/run/frpc.ini ./run/
+cp -rf ${DIR}/run/db ./run/
+if [ -f ${DIR}/run/frpc.ini ]; then
+    cp -f ${DIR}/run/frpc.ini ./run/
 fi
 
-sed -i "s|.*release.*|    release = '${REV}',|; \
-        s|.*cluster.*|    cluster = ${PORT},|" ${CONFIG}
+LUA=skynet/3rd/lua/lua
 
+if [ ${CONFIG} = "config.tb" ]; then
+    local STAT="local env = {} \
+          loadfile('${DIR}/${CONFIG}', 't', env)() \
+          local conf = env.sysapp.mqtt.conf
+          print(string.format('%s %s %s %s', \
+                              env.sys.host, \
+                              conf.id, \
+                              conf.uri, \
+                              conf.username))"
+    local RET=$(${LUA} -e "${STAT}")
+    local HOST=$(echo $RET | cut -f1 -d' ')
+    local NAME=$(echo $RET | cut -f2 -d' ')
+    local URI=$(echo $RET | cut -f3 -d' ')
+    local TOKEN=$(echo $RET | cut -f4 -d' ')
+
+    sed -i "s|SYS_VERSION|${REV}|; \
+            s|SYS_PLAT|${PLAT}|; \
+            s|30002|${PORT}|; \
+            s|SYS_HOST|${HOST}|; \
+            s|SYS_ID|${NAME}|; \
+            s|MQTT_ID|${NAME}|; \
+            s|MQTT_USERNAME|${TOKEN}|; \
+            s|MQTT_URI|${URI}|" ${CONFIG}
+elif [ ${CONFIG} = "config.local" ]; then
+    sed -i "s|SYS_VERSION|${REV}|; \
+            s|SYS_PLAT|${PLAT}|; \
+            s|30002|${PORT}|" ${CONFIG}
+fi
 
 sed -i "s|config|${CONFIG}|" iotedge.config.prod
 
@@ -35,9 +61,9 @@ FRP_SERVICE=frpc.service
 VPN_SERVICE=vpn.service
 
 install ./scripts/iotedge.service ${CORE_SERVICE}
-install ./app/host/${NODE_SERVICE} ${NODE_SERVICE}
-install ./app/frp/${FRP_SERVICE} ${FRP_SERVICE}
-install ./app/vpn/${VPN_SERVICE} ${VPN_SERVICE}
+install ./sys/host/${NODE_SERVICE} ${NODE_SERVICE}
+install ./sys/frp/${FRP_SERVICE} ${FRP_SERVICE}
+install ./sys/vpn/${VPN_SERVICE} ${VPN_SERVICE}
 
 systemctl daemon-reload
 systemctl enable ${CORE_SERVICE}

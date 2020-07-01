@@ -30,7 +30,6 @@ sysapp = {
             id = 'MQTT_ID',
             uri = 'MQTT_URI',
             username = 'MQTT_USERNAME',
-            password = 'MQTT_PASSWORD',
         }
     },
     host = {
