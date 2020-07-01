@@ -117,12 +117,6 @@ local cfg = {
     tpls = {}
 }
 
-cfg.total = {
-    repo = cfg.repo,
-    pipes = cfg.pipes,
-    apps = cfg.apps
-}
-
 local function do_load_tpl(dir, tpls, unique)
     for tpl in lfs.dir(dir) do
         if tpl ~= "." and tpl ~= ".." then
@@ -215,6 +209,12 @@ local function load_all()
     load_syspipe()
 
     load_auth()
+
+    cfg.total = {
+        repo = cfg.repo,
+        pipes = cfg.pipes,
+        apps = cfg.apps
+    }
 end
 
 --------------------- command ---------------------

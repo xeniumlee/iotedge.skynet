@@ -754,5 +754,5 @@ skynet.start(function()
             skynet.ret(skynet.pack(false, text.unknown_cmd))
         end
     end)
-    skynet.fork(load_all)
+    skynet.timeout(0, load_all)
 end)

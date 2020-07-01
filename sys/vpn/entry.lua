@@ -147,24 +147,23 @@ end
 
 local function init_info(cfg)
     info = { running = false }
-    if cfg.enabled then
-        info.proto = "udp"
-        info.listenport = cfg.listenport
-        info.max_idle = cfg.max_idle
 
-        local ok, key = pcall(read_file, publickey)
-        if ok then
-            info.publickey = key
-            info.token = basexx.to_hex(key)
-        end
+    info.proto = "udp"
+    info.listenport = cfg.listenport
+    info.max_idle = cfg.max_idle
 
-        local host = cfg.address:match(interface_address)
-        if host then
-            info.host = host
-        end
-
-        info.peers = peers
+    local ok, key = pcall(read_file, publickey)
+    if ok then
+        info.publickey = key
+        info.token = basexx.to_hex(key)
     end
+
+    local host = cfg.address:match(interface_address)
+    if host then
+        info.host = host
+    end
+
+    info.peers = peers
 end
 
 local function open_frp()
@@ -215,10 +214,10 @@ local function start(cfg)
     end
 end
 
-local function stop(cfg)
-    close_frp()
-    peers = {}
-    init_info(cfg)
+local function stop()
+    --close_frp()
+    --peers = {}
+    --init_info(cfg)
 
     local ok, err = sys.stop_svc(svc)
     if ok then
@@ -234,7 +233,7 @@ local function stop(cfg)
         log.error(err)
     end
 
-    os.remove(vpnini)
+    --os.remove(vpnini)
 
     return ok
 end
@@ -299,18 +298,16 @@ function vpn_info()
 end
 
 function on_conf(cfg)
-    if cfg.enabled == true then
-        local ok = pcall(validator.check, cfg, cfg_schema)
-        if ok then
-            return start(cfg)
-        else
-            return ok, text.invalid_conf
-        end
-    elseif cfg.enabled == false then
-        return stop(cfg)
+    local ok = pcall(validator.check, cfg, cfg_schema)
+    if ok then
+        return start(cfg)
     else
-        return false, text.invalid_conf
+        return ok, text.invalid_conf
     end
+end
+
+function on_exit()
+    stop()
 end
 
 reg_cmd()
