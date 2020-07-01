@@ -323,11 +323,16 @@ function list_proxy()
 end
 
 function on_conf(cfg)
-    local ok = pcall(validator.check, cfg, cfg_schema)
-    if ok then
-        return init_conf(cfg)
+    if cfg.server_addr == '' then
+        -- init config
+        return true
     else
-        return false, text.invalid_conf
+        local ok = pcall(validator.check, cfg, cfg_schema)
+        if ok then
+            return init_conf(cfg)
+        else
+            return false, text.invalid_conf
+        end
     end
 end
 

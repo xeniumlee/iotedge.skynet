@@ -505,6 +505,9 @@ function command.configure(arg)
                     else
                         conf = clone(applist[id].conf, conf)
                         ok, err = configure_app(id, conf)
+                        if ok then
+                            update_app(id)
+                        end
                     end
                 else
                     ok, err = false, id
