@@ -125,7 +125,7 @@ local post_map = {
 }
 
 function on_conf(conf)
-    math.randomseed(skynet.time())
+    math.randomseed(math.floor(skynet.time()))
     log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
     keepalive_timeout = conf.keep_alive*100
     seri.init(conf.seri)

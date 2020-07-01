@@ -3,7 +3,7 @@ local api = require "api"
 local log = require "log"
 local text = require("text").gateway
 
-local sysmgr_addr = ...
+local flowcontrol_str, audit_str = ...
 
 local command = {}
 local devlist = {}
@@ -194,28 +194,23 @@ setmetatable(command, { __index = function(t, dev)
 end})
 
 skynet.start(function()
-    local conf = skynet.call(sysmgr_addr, "lua", "conf_get", "internal", "gateway")
-    if conf then
-        audit = conf.audit
-        flowcontrol = conf.flowcontrol
-        if math.tointeger(flowcontrol) and flowcontrol>0 then
-            skynet.dispatch("lua", function(_, addr, cmd, ...)
-                if applist[addr] then
-                    command[cmd](addr, ...)
-                elseif req_num < flowcontrol then
-                    req_num = req_num + 1
-                    command[cmd](addr, ...)
-                    req_num = req_num - 1
-                else
-                    skynet.ret(skynet.pack(false, text.busy))
-                end
-            end)
-        else
-            skynet.dispatch("lua", function(_, addr, cmd, ...)
+    audit = (audit_str == "true")
+    flowcontrol = tonumber(flowcontrol_str)
+    if math.tointeger(flowcontrol) and flowcontrol>0 then
+        skynet.dispatch("lua", function(_, addr, cmd, ...)
+            if applist[addr] then
                 command[cmd](addr, ...)
-            end)
-        end
+            elseif req_num < flowcontrol then
+                req_num = req_num + 1
+                command[cmd](addr, ...)
+                req_num = req_num - 1
+            else
+                skynet.ret(skynet.pack(false, text.busy))
+            end
+        end)
     else
-        log.error(text.no_conf)
+        skynet.dispatch("lua", function(_, addr, cmd, ...)
+            command[cmd](addr, ...)
+        end)
     end
 end)

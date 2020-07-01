@@ -2,10 +2,10 @@ sys = {
     id = 'SYS_ID',
     release = 'SYS_VERSION',
     platform = 'SYS_PLAT',
+    host = 'SYS_HOST',
     cluster = 30002
 }
 auth = {
-    enabled = true,
     username = '9c1d55b6274a7456540ec64bb39cd604',
     password = 'c41441edb82f7d3461925a3385c98501',
 }
@@ -13,9 +13,52 @@ gateway = {
     flowcontrol = 10,
     audit = true
 }
-gateway_ws = {
-    enabled = false
+sysapp = {
+    gateway_console = {
+        tpl = "gateway_console",
+        enabled = true,
+        read_only = true,
+        conf = {
+            auth_enabled = true,
+        }
+    },
+    mqtt = {
+        tpl = 'gateway_mqtt_tb',
+        enabled = false,
+        read_only = true,
+    },
+    host = {
+        tpl = "host",
+        enabled = true,
+        read_only = true,
+    },
+    frp = {
+        tpl = "frp",
+        enabled = true,
+        read_only = false,
+    },
+    vpn = {
+        tpl = "vpn",
+        enabled = true,
+        read_only = false,
+    },
+    python = {
+        tpl = "python",
+        enabled = true,
+        read_only = false,
+    },
+    ws = {
+        tpl = "gateway_ws",
+        enabled = false,
+        read_only = true,
+        conf = {
+            auth_enabled = true,
+        }
+    },
+    ws_proxy = {
+        tpl = "ws_proxy",
+        enabled = false,
+        read_only = true,
+    }
 }
-ws_proxy = {
-    enabled = false
-}
+syspipe = {}

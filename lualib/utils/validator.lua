@@ -23,7 +23,7 @@ function validator.ipv4(v)
 end
 
 function validator.httpurl(v)
-    return type(v)=="string" and v:match("^http://[%w%.%-%/]+$")
+    return type(v)=="string" and v:match("^https?://[%w%.%-%/]+$")
 end
 
 function validator.opcurl(v)

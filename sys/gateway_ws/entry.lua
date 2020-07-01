@@ -8,10 +8,10 @@ local log = require "log"
 local text = require("text").console
 
 local ip = "127.0.0.1"
-local port, auth_enabled = ...
-auth_enabled = auth_enabled == "true"
+local running = false
+local auth_enabled = true
 
-local protocol = "ws"
+local listen_socket = false
 local connected = false
 local authed = false
 local count = 0
@@ -120,7 +120,7 @@ function handle.message(fd, msg)
     end
 end
 
-local function on_data(dev, data)
+function on_data(dev, data)
     if connected and authed and
         type(dev) == "string" and type(data) == "table" then
         local payload = seri.pack({[dev] = data})
@@ -130,26 +130,25 @@ local function on_data(dev, data)
     end
 end
 
-skynet.start(function()
-    local running = true
+function on_exit()
+    running = false
+    socket.close(listen_socket)
+    websocket.close(connected)
+end
+
+function on_conf(conf)
+    running = true
+    auth_enabled = conf.auth_enabled
     seri.init("json")
-    local listen_socket = socket.listen(ip, port)
+    listen_socket = socket.listen(ip, conf.port)
 
     socket.start(listen_socket, function(fd, addr)
         if running and not connected then
             connected = fd
-            skynet.fork(websocket.accept, fd, handle, protocol, addr)
+            skynet.fork(websocket.accept, fd, handle, "ws", addr)
         else
             socket.close(fd)
         end
     end)
-    skynet.dispatch("lua", function(_, _, cmd, ...)
-        if cmd == "stop" then
-            running = false
-            socket.close(listen_socket)
-            websocket.close(connected)
-        elseif cmd == "data" then
-            on_data(...)
-        end
-    end)
-end)
+    return true
+end

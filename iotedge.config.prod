@@ -14,6 +14,7 @@ lua_path = "lualib/?.luac;"..
            "lualib/?/init.luac;"..
            "skynet/lualib/?.luac;"..
            "skynet/lualib/?/init.luac;"..
+           "sys/?/entry.luac;"..
            "app/?/entry.luac"
 
 luaservice = "service/?.luac;"..

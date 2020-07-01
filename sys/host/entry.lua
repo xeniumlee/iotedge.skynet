@@ -85,7 +85,7 @@ function post_attr()
 end
 
 function on_conf(cfg)
-    local sys_cfg = api.internal_request("conf_get", "sys")
+    local sys_cfg = api.internal_request("get_conf", "sys")
     local host = cfg[sys_cfg.host] and sys_cfg.host or "general"
     local tags = cfg.common
     for k, v in pairs(cfg[host]) do

@@ -14,19 +14,18 @@ local function execute(cmd)
 end
 
 local sys = {
+    ssh_port = 22,
+    ws_proxy_port = 29999,
     console_port = 30000,
     ws_port = 30001,
-    ws_proxy_port = 29999,
-    vpn_port = 1194,
-    ssh_port = 22,
+    sys_root = "sys",
     app_root = "app",
-    db_root = "db",
     run_root = "run",
-    repo_cfg = "run/repo",
-    pipe_cfg = "run/pipe",
+    db_root = "db",
+    repo_cfg = "repo",
+    pipe_cfg = "pipe",
     meta_lua = "meta",
     entry_lua = "entry",
-    invalid_addr = "invalid_addr",
     gateway_global = "iotedge-gateway",
 }
 

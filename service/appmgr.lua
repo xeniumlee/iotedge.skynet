@@ -10,13 +10,6 @@ local interval = 500 -- 5 seconds
 local limit = 4 -- 15 seconds
 local locked = true
 
-local wsapp_addr, mqttapp_addr = ...
-local wsappid = api.wsappid
-local mqttappid = api.mqttappid
-local hostappid = api.hostappid
-local frpappid = api.frpappid
-local vpnappid = api.vpnappid
-
 local sysinfo = {}
 local applist = {}
 local pipelist = {}
@@ -33,164 +26,16 @@ local function gen_appid()
     return #applist + 1
 end
 
-local function sysapp(id)
-    return id == mqttappid or
-           id == wsappid or
-           id == hostappid or
-           id == frpappid or
-           id == vpnappid
+local function sysapp(tpl)
+    return tpllist[tpl].unique
+end
+
+local function readonly_app(tpl)
+    return tpllist[tpl].read_only
 end
 
 local function syspipe(id)
-    return id == hostappid
-end
-
-local function make_appinfo(app)
-    local info = {}
-    if app.conf and app.name ~= hostappid then
-        info.conf = app.conf
-    end
-    info.load_time = app.load_time
-    return info
-end
-
-local function make_pipeinfo(pipe)
-    local info = {}
-    info.start_time = pipe.start_time or nil
-    info.stop_time = pipe.stop_time or nil
-    info.apps = {}
-    for idx, id in ipairs(pipe.apps) do
-        info.apps[idx] = applist[id].name
-    end
-    return info
-end
-
-local function refresh_info()
-    local apps = {}
-    local name
-    for id, app in pairs(applist) do
-        apps[app.name] = make_appinfo(app)
-    end
-
-    local pipes = {}
-    for id, pipe in pairs(pipelist) do
-        pipes[id] = make_pipeinfo(pipe)
-    end
-    sysinfo.apps = apps
-    sysinfo.pipes = pipes
-end
-
-local function update_app(id)
-    local app = applist[id]
-    api.internal_request("update_app", { id, app.tpl, app.conf })
-    refresh_info()
-end
-
-local function remove_app(id, nosave)
-    local app = applist[id]
-    skynet.send(app.addr, "lua", "exit")
-    if not nosave then
-        api.internal_request("update_app", { id, app.tpl, false })
-    end
-    applist[id] = nil
-    refresh_info()
-end
-
-local function update_pipes()
-    refresh_info()
-    local list = {}
-    for k, v in pairs(pipelist) do
-        if not syspipe(k) then
-            list[k] = {}
-            list[k].auto = (v.start_time ~= false)
-            list[k].apps = v.apps
-        end
-    end
-    api.internal_request("update_pipes", list)
-end
-
-local function validate_repo(repo)
-    if repo then
-        assert(type(repo) == "table" and
-            type(repo.uri) == "string" and
-            (type(repo.auth) == "string" or type(repo.auth) == "table"),
-            text.invalid_repo)
-
-        local auth
-        if type(repo.auth) == "string" then
-            local k, v = repo.auth:match("^([%g%s]+):([%g%s]+)$")
-            if k and v then
-                auth = { [k] = v }
-            end
-        elseif type(repo.auth) == "table" then
-            local k, v = next(repo.auth)
-            if type(k) == "string" and type(v) == "string" then
-                auth = repo.auth
-            end
-        end
-        assert(auth, text.invalid_repo)
-        local ok, err = api.internal_request("update_repo", { repo.uri, auth })
-        if ok then
-            sysinfo.sys.repo = repo.uri
-        else
-            error(err)
-        end
-    end
-    assert(sysinfo.sys.repo, text.invalid_repo)
-end
-
-local function validate_appname(name)
-    if sysapp(name) then
-        return name, name
-    elseif type(name) == "string" then
-        local tpl, id = name:match("^(.+)_(%d+)$")
-        local i = tonumber(id)
-        if tpllist[tpl] and applist[i] then
-            return i, tpl
-        else
-            error(text.unknown_app)
-        end
-    else
-        error(text.unknown_app)
-    end
-end
-
-local function validate_pipe_with_apps(pipe, apps)
-    assert(type(pipe) == "table" and
-        type(pipe.apps) == "table" and #(pipe.apps) > 1 and
-        (pipe.auto == nil or type(pipe.auto) == "boolean"),
-        text.invalid_arg)
-    for _, name in pairs(pipe.apps) do
-        if sysapp(name) then
-            assert(applist[name], text.unknown_app)
-        else
-            assert(apps[name], text.unknown_app)
-        end
-    end
-end
-
-local function validate_pipe(pipe)
-    assert(type(pipe) == "table" and
-        type(pipe.apps) == "table" and #(pipe.apps) > 1 and
-        (pipe.auto == nil or type(pipe.auto) == "boolean"),
-        text.invalid_arg)
-    local id
-    for i, name in pairs(pipe.apps) do
-        id = validate_appname(name)
-        pipe.apps[i] = id
-    end
-end
-
-local function install_tpl(tpl)
-    if not tpllist[tpl] then
-        validate_repo()
-        local ok, ret = api.internal_request("install_tpl", tpl)
-        if ok then
-            tpllist[tpl] = ret
-        else
-            error(ret)
-        end
-    end
+    return not tonumber(id)
 end
 
 local function clone(tpl, custom)
@@ -216,82 +61,68 @@ local function clone(tpl, custom)
     end
 end
 
-local function validate_appconf(arg)
-    assert(type(arg) == "table", text.invalid_arg)
-    local tpl, conf = next(arg)
-    assert(type(tpl) == "string" and
-        tpl:match("^[%l%d_]+$") and
-        type(conf) == "table", text.invalid_arg)
-    install_tpl(tpl)
-    return tpl, clone(tpllist[tpl], conf)
+--------------------- info ---------------------
+local function make_appinfo(app)
+    local info = {}
+    if app.conf and app.name ~= api.hostappid then
+        info.conf = app.conf
+    end
+    info.load_time = app.load_time
+    return info
 end
 
-local function validate_full_conf(arg)
-    assert((arg.pipes == nil and arg.apps == nil) or
-           (arg.pipes == nil and type(arg.apps) == "table") or
-           (type(arg.pipes) == "table" and type(arg.apps) == "table"),
-           text.invalid_arg)
-
-    if arg.repo then
-        validate_repo(arg.repo)
+local function make_pipeinfo(pipe)
+    local info = {}
+    info.start_time = pipe.start_time or nil
+    info.stop_time = pipe.stop_time or nil
+    info.apps = {}
+    for idx, id in ipairs(pipe.apps) do
+        info.apps[idx] = applist[id].name
     end
-
-    for _, pipe in pairs(arg.pipes) do
-        validate_pipe_with_apps(pipe, arg.apps)
-    end
-
-    local tpl, conf
-    for _, app in pairs(arg.apps) do
-        tpl, conf = validate_appconf(app)
-        app[tpl] = conf
-    end
+    return info
 end
 
-local function validate_existing_conf(arg)
-    if arg.repo then
-        validate_repo(arg.repo)
+local function refresh_info()
+    local apps = {}
+    for id, app in pairs(applist) do
+        apps[app.name] = make_appinfo(app)
+    end
+
+    local pipes = {}
+    for id, pipe in pairs(pipelist) do
+        pipes[id] = make_pipeinfo(pipe)
+    end
+    sysinfo.apps = apps
+    sysinfo.pipes = pipes
+end
+
+--------------------- update ---------------------
+local function update_app(id, remove)
+    local app = applist[id]
+    if remove then
+        skynet.send(app.addr, "lua", "exit")
+        api.internal_request("update_app", { id, app.tpl, false })
+        applist[id] = nil
     else
-        local name, conf = next(arg)
-        assert(type(conf) == "table", text.invalid_arg)
-        local id, tpl = validate_appname(name)
+        api.internal_request("update_app", { id, app.tpl, app.conf })
+    end
+    refresh_info()
+end
 
-        local app = applist[id]
-        if app.conf then
-            return id, clone(app.conf, conf)
-        else
-            return id, clone(tpllist[tpl], conf)
+local function update_pipes()
+    local list = {}
+    for k, v in pairs(pipelist) do
+        if not syspipe(k) then
+            list[k] = {}
+            list[k].auto = (v.start_time ~= false)
+            list[k].apps = v.apps
         end
     end
+    api.internal_request("update_pipes", list)
+    refresh_info()
 end
 
-local function load_app(id, tpl)
-    local app = {
-        name = sysapp(id) and id or tpl.."_"..id,
-        tpl = tpl,
-        conf = false,
-        route = {}
-    }
-    -- to reserve id
-    applist[id] = app
-
-    local ok, addr = pcall(skynet.newservice, "appcell", app.tpl, app.name)
-    if ok then
-        app.addr = addr
-        app.load_time = api.datetime()
-
-        appmonitor[addr] = {
-            id = app.name,
-            counter = 0
-        }
-        log.info(text.load_suc, app.name)
-        return true
-    else
-        applist[id] = nil
-        log.error(text.load_fail, tpl, addr)
-        return false, text.load_fail
-    end
-end
-
+--------------------- action ---------------------
 local function start_pipe(id)
     local apps = pipelist[id].apps
     for i, appid in ipairs(apps) do
@@ -365,39 +196,92 @@ local function load_pipe(id, apps)
     return true
 end
 
-local function configure_app(id, conf, nosave)
-    local a = applist[id]
-    log.info(text.app_conf, a.name, "\n", dump(conf))
+local function load_app(id, tpl)
+    local app = {
+        name = sysapp(tpl) and id or string.format("%s_%s", tpl, id),
+        tpl = tpl,
+        conf = false,
+        route = {}
+    }
+    -- to reserve id
+    applist[id] = app
 
-    local ok, ret, err = pcall(skynet.call, a.addr, "lua", "conf", conf)
-    if ok and ret then
-        a.conf = conf
-        if not nosave and not a.read_only then
-            update_app(id)
-        end
+    local ok, addr = pcall(skynet.newservice, "appcell", app.tpl, app.name)
+    if ok then
+        app.addr = addr
+        app.load_time = api.datetime()
+
+        appmonitor[addr] = {
+            id = app.name,
+            counter = 0
+        }
+        log.info(text.load_suc, app.name)
         return true
     else
-        err = ok and err or ret
-        err = string.format("%s(%s)", err, a.name)
+        applist[id] = nil
+        log.error(text.load_fail, tpl, addr)
+        return false, text.load_fail
+    end
+end
+
+local function configure_app(id, conf)
+    local app = applist[id]
+    log.info(text.app_conf, app.name, "\n", dump(conf))
+
+    local ok, ret, err = pcall(skynet.call, app.addr, "lua", "conf", conf)
+    if ok and ret then
+        app.conf = conf
+        return true
+    else
+        err = string.format("%s(%s)", ok and err or ret, app.name)
         log.error(text.conf_fail, err)
         return false, err
     end
 end
 
-local function configure_all(arg, nosave)
-    local ok, err, tpl, conf
-    for id, app in pairs(arg.apps) do
-        tpl, conf = next(app)
-        if sysapp(id) then
-            ok, err = configure_app(id, conf, nosave)
-            if not ok then
-                return ok, err
+local function do_clean()
+    for id, _ in pairs(pipelist) do
+        if not syspipe(id) then
+            stop_pipe(id)
+            pipelist[id] = nil
+        end
+    end
+    update_pipes()
+
+    for id, app in pairs(applist) do
+        if not sysapp(app.tpl) then
+            update_app(id, true)
+        end
+    end
+    log.info(text.cleaned)
+end
+
+local function configure_external(c)
+    do_clean()
+    skynet.sleep(3000)
+
+    local ok, err
+    for id, app in pairs(c.apps) do
+        local tpl, conf = next(app)
+
+        if applist[id] then
+            if not readonly_app(tpl) then
+                conf = clone(applist[id].conf, conf)
+                ok, err = configure_app(id, conf)
+                if ok then
+                    update_app(id)
+                else
+                    return ok, err
+                end
             end
         else
             ok, err = load_app(id, tpl)
             if ok then
-                ok, err = configure_app(id, conf, nosave)
-                if not ok then
+                conf = clone(tpllist[tpl].conf, conf)
+                ok, err = configure_app(id, conf)
+                if ok then
+                    update_app(id)
+                else
                     return ok, err
                 end
             else
@@ -405,77 +289,41 @@ local function configure_all(arg, nosave)
             end
         end
     end
-    for id, pipe in pairs(arg.pipes) do
-        ok, err = load_pipe(id, pipe.apps)
-        if ok then
-            try_start_pipe(id, pipe.auto)
-            if not nosave then
+
+    for id, pipe in pairs(c.pipes) do
+        if not pipelist[id] then
+            ok, err = load_pipe(id, pipe.apps)
+            if ok then
+                try_start_pipe(id, pipe.auto)
                 update_pipes()
+            else
+                return ok, err
             end
-        else
-            return ok, err
         end
     end
+
     return true
 end
 
-local function load_hostapp()
-    local tpl = hostappid
-    local ok = load_app(hostappid, tpl)
-    if ok then
-        applist[hostappid].read_only = true
-        local conf = clone(tpllist[tpl], {})
-        ok = configure_app(hostappid, conf)
+local function configure_internal(c)
+    for id, app in pairs(c.apps) do
+        local tpl, conf = next(app)
+        local ok = load_app(id, tpl)
         if ok then
-            local pipe = { hostappid, mqttappid }
-            ok = load_pipe(hostappid, pipe)
-            if ok then
-                start_pipe(hostappid)
-            end
+            conf = clone(tpllist[tpl].conf, conf)
+            configure_app(id, conf)
+        end
+    end
+    for id, pipe in pairs(c.pipes) do
+        local ok = load_pipe(id, pipe.apps)
+        if ok then
+            try_start_pipe(id, pipe.auto)
         end
     end
 end
 
-local function load_frpapp()
-    local tpl = frpappid
-    load_app(frpappid, tpl)
-end
-
-local function load_vpnapp()
-    local tpl = vpnappid
-    load_app(vpnappid, tpl)
-end
-
-local function load_sysapp()
-    local now = api.datetime()
-    if wsapp_addr ~= sys.invalid_addr then
-        applist[wsappid] = {
-            name = wsappid,
-            addr = wsapp_addr,
-            load_time = now,
-            app = "gateway_websocket",
-            conf = 30001,
-            read_only = true,
-            route = {}
-        }
-    end
-    if mqttapp_addr ~= sys.invalid_addr then
-        applist[mqttappid] = {
-            name = mqttappid,
-            addr = mqttapp_addr,
-            load_time = now,
-            app = "gateway_mqtt",
-            read_only = true,
-            route = {}
-        }
-        load_hostapp()
-    end
-    load_frpapp()
-    load_vpnapp()
-end
-
 local cmd_desc = {
-    mqttapp = true,
+    stop = "Stop all APPs",
     configure = "System configure: {}",
     upgrade = "System upgrade: <string>",
     info = "Show system info",
@@ -491,56 +339,137 @@ local cmd_desc = {
 local function load_all()
     api.sys_init(cmd_desc)
 
-    sysinfo.sys = api.internal_request("conf_get", "sys")
-    sysinfo.sys.cluster = nil
+    sysinfo.sys = api.internal_request("get_conf", "sys")
     sysinfo.sys.up = api.datetime(skynet.starttime())
-    sysinfo.sys.repo = false
-    sysinfo.apps = {}
-    sysinfo.pipes = {}
 
-    tpllist = api.internal_request("conf_get", "tpls")
+    tpllist = api.internal_request("get_conf", "tpls")
+    local total = api.internal_request("get_conf", "total")
+    sysinfo.sys.repo = total.repo.uri
 
-    load_sysapp()
+    configure_internal(total)
 
-    local total = api.internal_request("conf_get", "total")
-
-    -- enabled by default
-    if not total.apps[vpnappid] then
-        total.apps[vpnappid] = { [vpnappid] = clone(tpllist[vpnappid], {}) }
-    end
-
-    local ok, err = pcall(validate_full_conf, total)
-    if ok then
-        configure_all(total, true)
-    else
-        log.error(text.conf_fail, err)
-    end
     refresh_info()
-
     locked = false
 end
 
+--------------------- command ---------------------
 function command.apps()
-    return tpllist
+    local ret = {}
+    for k, v in pairs(tpllist) do
+        if not v.unique then
+            ret[k] = v
+        end
+    end
+    return ret
 end
 
-function command.clean(nosave)
-    for id, _ in pairs(pipelist) do
-        if not syspipe(id) then
-            stop_pipe(id)
-            pipelist[id] = nil
-        end
-    end
-    if not nosave then
-        update_pipes()
-    end
-
-    for id, _ in pairs(applist) do
-        if not sysapp(id) then
-            remove_app(id, nosave)
-        end
+function command.stop()
+    for _, app in pairs(applist) do
+        skynet.send(app.addr, "lua", "exit")
     end
     log.info(text.cleaned)
+    return true
+end
+
+local function validate_repo(repo)
+    return pcall(function()
+        assert(type(repo) == "table" and
+            type(repo.uri) == "string" and
+            (type(repo.auth) == "string" or type(repo.auth) == "table"),
+            text.invalid_repo)
+
+        local auth
+        if type(repo.auth) == "string" then
+            local k, v = repo.auth:match("^([%g%s]+):([%g%s]+)$")
+            if k and v then
+                auth = { [k] = v }
+            end
+        else
+            local k, v = next(repo.auth)
+            if type(k) == "string" and type(v) == "string" then
+                auth = repo.auth
+            end
+        end
+        assert(auth, text.invalid_repo)
+
+        local ok, err = api.internal_request("update_repo", { repo.uri, auth })
+        assert(ok, err)
+
+        sysinfo.sys.repo = repo.uri
+    end)
+end
+
+local function validate_appname(name)
+    if applist[name] then
+        return true, name, applist[name].tpl
+    else
+        if type(name) == "string" then
+            local tpl, id = name:match("^(.+)_(%d+)$")
+            id = tonumber(id)
+            if tpllist[tpl] and applist[id] then
+                return true, id, tpl
+            else
+                return false, text.unknown_app
+            end
+        else
+            return false, text.unknown_app
+        end
+    end
+end
+
+local function validate_appconf(arg)
+    return pcall(function()
+        assert(type(arg) == "table", text.invalid_arg)
+        local tpl, conf = next(arg)
+        assert(type(tpl) == "string" and
+            tpl:match("^[%l%d_]+$") and
+            type(conf) == "table", text.invalid_arg)
+
+        if not tpllist[tpl] then
+            assert(sysinfo.sys.repo, text.invalid_repo)
+            local ok, ret = api.internal_request("install_tpl", tpl)
+            assert(ok, ret)
+            tpllist[tpl] = ret
+        end
+        return tpl, conf
+    end)
+end
+
+local function validate_full_conf(arg)
+    if type(arg.pipes) ~= "table" or type(arg.apps) ~= "table" then
+        return false, text.invalid_arg
+    end
+
+    if arg.repo then
+        local ok, err = validate_repo(arg.repo)
+        if not ok then
+            return false, err
+        end
+    end
+
+    local apps = arg.apps
+    for _, pipe in pairs(arg.pipes) do
+        if type(pipe) == "table" and
+            type(pipe.apps) == "table" and #(pipe.apps) > 1 and
+            (pipe.auto == nil or type(pipe.auto) == "boolean") then
+
+            for _, id in pairs(pipe.apps) do
+                if not apps[id] then
+                    return false, text.unknown_app
+                end
+            end
+        else
+            return false, text.invalid_arg
+        end
+    end
+
+    for _, app in pairs(apps) do
+        local ok, err = validate_appconf(app)
+        if not ok then
+            return ok, err
+        end
+    end
+
     return true
 end
 
@@ -551,29 +480,45 @@ function command.configure(arg)
     if type(arg) ~= "table" then
         return false, text.invalid_arg
     end
-    local ok, err
+
     locked = true
+    local ok, err
+
     if type(arg.pipes) == "table" then
-        ok, err = pcall(validate_full_conf, arg)
+        ok, err = validate_full_conf(arg)
         if ok then
-            command.clean()
-            skynet.sleep(3000)
-            ok, err = configure_all(arg)
+            ok, err = configure_external(arg)
         end
     else
-        local conf
-        ok, err, conf = pcall(validate_existing_conf, arg)
-        if ok and err then
-            local id = err
-            if applist[id].read_only then
-                ok, err = false, text.app_readonly
+        if arg.repo then
+            ok, err = validate_repo(arg.repo)
+        else
+            local name, conf = next(arg)
+            if type(conf) ~= "table" then
+                ok, err = false, text.invalid_arg
             else
-                ok, err = configure_app(id, conf)
+                local id, tpl
+                ok, id, tpl = validate_appname(name)
+                if ok then
+                    if readonly_app(tpl) then
+                        ok, err = false, text.app_readonly
+                    else
+                        conf = clone(applist[id].conf, conf)
+                        ok, err = configure_app(id, conf)
+                    end
+                else
+                    ok, err = false, id
+                end
             end
         end
     end
+
     locked = false
-    return ok, err
+    if ok then
+        return ok
+    else
+        return ok, err
+    end
 end
 
 function command.upgrade(version)
@@ -587,30 +532,24 @@ function command.upgrade(version)
     if version == sysinfo.sys.version then
         return false, text.dup_upgrade_version
     end
-    local ok, err = pcall(validate_repo)
-    if not ok then
-        return ok, err
+    if not sysinfo.sys.repo then
+        return false, text.invalid_repo
     end
+
     locked = true
-    ok, err = api.internal_request("upgrade", version)
+
+    local ok, err = api.internal_request("upgrade", version)
     if not ok then
         locked = false
     end
     return ok, err
 end
 
-function command.mqttapp(conf)
-    local m = applist[mqttappid]
-    m.conf = conf
-    refresh_info()
-    return true
-end
-
 function command.app_new(arg)
     if locked then
         return false, text.locked
     end
-    local ok, tpl, conf = pcall(validate_appconf, arg)
+    local ok, tpl, conf = validate_appconf(arg)
     if not ok then
         return ok, tpl
     end
@@ -623,35 +562,63 @@ function command.app_new(arg)
     local err
     ok, err = load_app(id, tpl)
     if ok then
-        return configure_app(id, conf)
+        conf = clone(tpllist[tpl].conf, conf)
+        ok, err = configure_app(id, conf)
+        if ok then
+            update_app(id)
+            return ok
+        else
+            return ok, err
+        end
     else
         return ok, err
     end
 end
+
 function command.app_remove(name)
     if locked then
         return false, text.locked
     end
-    if sysapp(name) then
-        return false, text.sysapp_remove
-    end
-    local ok, id = pcall(validate_appname, name)
+    local ok, id, tpl = validate_appname(name)
     if not ok then
         return ok, id
+    end
+    if sysapp(tpl) then
+        return false, text.sysapp_remove
     end
     if next(applist[id].route) ~= nil then
         return false, text.app_inuse
     end
 
-    remove_app(id)
+    update_app(id, true)
     return true
+end
+
+local function validate_pipe(pipe)
+    if type(pipe) == "table" and
+        type(pipe.apps) == "table" and #(pipe.apps) > 1 and
+        (pipe.auto == nil or type(pipe.auto) == "boolean") then
+
+        for i, app in pairs(pipe.apps) do
+            local ok, id = validate_appname(app)
+            if ok then
+                -- app name to id
+                pipe.apps[i] = id
+            else
+                return ok, id
+            end
+        end
+        return true
+    else
+        return false, text.invalid_arg
+    end
 end
 
 function command.pipe_new(pipe)
     if locked then
         return false, text.locked
     end
-    local ok, err = pcall(validate_pipe, pipe)
+    local ok, err = validate_pipe(pipe)
     if not ok then
         return ok, err
     end
@@ -665,6 +632,7 @@ function command.pipe_new(pipe)
         return ok, err
     end
 end
+
 function command.pipe_remove(arg)
     if locked then
         return false, text.locked
@@ -672,6 +640,7 @@ function command.pipe_remove(arg)
     if syspipe(arg) then
         return false, text.syspipe_remove
     end
+
     local id = tonumber(arg)
     local pipe = pipelist[id]
     if not pipe then
@@ -688,6 +657,7 @@ function command.pipe_remove(arg)
     update_pipes()
     return true
 end
+
 function command.pipe_start(arg)
     if locked then
         return false, text.locked
@@ -695,6 +665,7 @@ function command.pipe_start(arg)
     if syspipe(arg) then
         return false, text.pipe_running
     end
+
     local id = tonumber(arg)
     local pipe = pipelist[id]
     if not pipe then
@@ -708,6 +679,7 @@ function command.pipe_start(arg)
     update_pipes()
     return true
 end
+
 function command.pipe_stop(arg)
     if locked then
         return false, text.locked
@@ -715,6 +687,7 @@ function command.pipe_stop(arg)
     if syspipe(arg) then
         return false, text.syspipe_stop
     end
+
     local id = tonumber(arg)
     local pipe = pipelist[id]
     if not pipe then
@@ -734,6 +707,7 @@ function command.info()
     return sysinfo
 end
 
+--------------------- monitor ---------------------
 local function signal(addr)
     core.command("SIGNAL", skynet.address(addr))
 end
@@ -758,6 +732,7 @@ local function check()
     skynet.timeout(interval, check)
 end
 
+--------------------- service ---------------------
 skynet.start(function()
     skynet.register_protocol {
         name = "client",

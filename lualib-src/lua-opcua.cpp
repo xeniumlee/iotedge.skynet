@@ -1,7 +1,7 @@
 #include "open62541/client_highlevel.h"
 #include "open62541/client_config_default.h"
 
-#include "open62541/plugin/log_stdout.h"
+//#include "open62541/plugin/log_stdout.h"
 
 #define SOL_ALL_SAFETIES_ON 1
 
@@ -106,12 +106,11 @@ namespace opcua {
             UA_ClientConfig_setDefaultEncryption(
                     config, certificate, privateKey, trustList, trustListSize, revocationList, revocationListSize);
 
+            config->logger.log = NULL;
+            config->logger.clear = NULL;
             config->clientDescription.applicationUri = UA_STRING_ALLOC(ApplicationUri.data());
             config->securityMode = Mode;
             config->securityPolicyUri = UA_STRING_ALLOC(Policy.data());
-
-            //config->logger.log = NULL;
-            //config->logger.clear = NULL;
         }
 
         ~Client() {

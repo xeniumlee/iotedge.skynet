@@ -564,21 +564,18 @@ local function stop()
     end
 end
 
-local function start(d, polls)
-    running = true
-    skynet.sleep(api.post_delay)
-    regdev(d)
-    math.randomseed(skynet.time())
-    for _, poll in pairs(polls) do
-        skynet.timeout(math.random(100, 200), poll)
-    end
-end
-
 local function config_devices(d, tle)
     local ok, polls, max = pcall(validate_devices, d, tle)
     if ok then
         max_wait = max // 10
-        skynet.fork(start, d, polls)
+        skynet.timeout(api.post_delay, function()
+            running = true
+            regdev(d)
+            math.randomseed(math.floor(skynet.time()))
+            for _, poll in pairs(polls) do
+                skynet.timeout(math.random(100, 200), poll)
+            end
+        end)
         log.info(strfmt("%s: total(%d), max interval(%ds)",
                 daqtxt.poll_start, #polls, max // 1000))
         return ok

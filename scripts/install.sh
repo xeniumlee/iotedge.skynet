@@ -30,7 +30,6 @@ if [ ${CONFIG} = "config.tb" ]; then
             s|SYS_HOST|${HOST}|; \
             s|MQTT_ID|${NAME}|; \
             s|MQTT_USERNAME|${TOKEN}|; \
-            s|MQTT_PASSWORD||; \
             s|MQTT_URI|${URI}|" ${CONFIG}
 elif [ ${CONFIG} = "config.local" ]; then
     sed -i "s|SYS_VERSION|${REV}|; \

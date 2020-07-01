@@ -65,6 +65,18 @@ cmake -DCMAKE_BUILD_TYPE=Release -DUA_ENABLE_ENCRYPTION_OPENSSL=ON -DOPENSSL_CRY
 make
 cp bin/libopen62541.a ../../iotedge/bin/prebuilt/libopen62541.a.1.1
 ```
+#### Install dependency
+```
+https://luarocks.org/releases/luarocks-3.3.1.tar.gz
+./configure --with-lua-bin=../iotedge/skynet/3rd/lua --with-lua-include=../iotedge/skynet/3rd/lua --with-lua=../iotedge/skynet/3rd/lua
+make bootstrap
+
+luarocks install luafilesystem
+luarocks install lsqlite3complete
+
+git clone https://github.com/cloudwu/lua-cjson.git
+make LUA_VERSION=5.4 LUA_INCLUDE_DIR=../iotedge/skynet/3rd/lua
+```
 ### Run
 * cp config.xx config
 * Edit config

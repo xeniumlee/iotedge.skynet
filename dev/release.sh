@@ -40,7 +40,7 @@ if [ -n "${PLAT}" ]; then
         INFO=PLATFORM
         echo -n ${REV}-${PLAT} > ${INFO}
 
-        LUADIRS="lualib skynet/lualib service skynet/service app/host app/frp app/vpn"
+        LUADIRS="lualib skynet/lualib service skynet/service sys"
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
@@ -63,16 +63,14 @@ if [ -n "${PLAT}" ]; then
 
         for APP in app/*; do
             BASE=$(basename ${APP})
-            if [ ${BASE} != "host" ] && [ ${BASE} != "frp" ] && [ ${BASE} != "vpn" ]; then
-                compile ${APP}
+            compile ${APP}
 
-                TARBALL=${RELEASE_DIR}/v_${BASE#*_v_}.tar.gz
-                tar --exclude=*.lua -czf ${TARBALL} ${APP}
-                find . -name "*.luac" |xargs rm -f
+            TARBALL=${RELEASE_DIR}/v_${BASE#*_v_}.tar.gz
+            tar --exclude=*.lua -czf ${TARBALL} ${APP}
+            find . -name "*.luac" |xargs rm -f
 
-                echo "${TARBALL} created"
-                upload ${BASE%_v_*} ${TARBALL}
-            fi
+            echo "${TARBALL} created"
+            upload ${BASE%_v_*} ${TARBALL}
         done
     else
         echo "$0 x86_64/arm_v7 repo"

@@ -5,8 +5,8 @@ local text = require("text").console
 local regex = require("text").regex
 
 local ip = "127.0.0.1"
-local port, auth_enabled = ...
-auth_enabled = auth_enabled == "true"
+local running = false
+local listen_socket = false
 
 local connections = 0
 local max = 1
@@ -125,14 +125,14 @@ local function auth(fd)
     return api.internal_request("auth", {u, p})
 end
 
-skynet.start(function()
-    local running = true
-    local listen_socket = socket.listen(ip, port)
+function on_conf(conf)
+    running = true
+    listen_socket = socket.listen(ip, conf.port)
     socket.start(listen_socket, function(fd, addr)
         if running then
             if connections < max then
                 socket.start(fd)
-                if not auth_enabled or auth(fd) then
+                if not conf.auth_enabled or auth(fd) then
                     fds[fd] = true
                     connections = connections + 1
                     skynet.fork(console_main_loop, fd)
@@ -149,13 +149,13 @@ skynet.start(function()
             socket.close(fd)
         end
     end)
-    skynet.dispatch("lua", function(_, _, cmd, ...)
-        if cmd == "stop" then
-            running = false
-            socket.close(listen_socket)
-            for fd, _ in pairs(fds) do
-                socket.close(fd)
-            end
-        end
-    end)
-end)
+    return true
+end
+
+function on_exit()
+    running = false
+    socket.close(listen_socket)
+    for fd, _ in pairs(fds) do
+        socket.close(fd)
+    end
+end

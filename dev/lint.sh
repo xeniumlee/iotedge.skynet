@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DIRS="app lualib service examples"
+DIRS="sys app lualib service examples"
 
 echo "---- print ----"
 for DIR in $DIRS; do

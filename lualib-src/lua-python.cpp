@@ -41,10 +41,10 @@ namespace python {
                 }
             case sol::type::number:
                 {
-                    //if (Obj.is<double>())
-                    //    return PyFloat_FromDouble(Obj.as<double>());
-                    //else
-                        return PyLong_FromLong(Obj.as<long>());
+                    if (Obj.is<int64_t>())
+                        return PyLong_FromLong(Obj.as<int64_t>());
+                    else
+                        return PyFloat_FromDouble(Obj.as<double>());
                 }
             default:
                 return NULL;
@@ -55,9 +55,21 @@ namespace python {
         if (Py_IsInitialized())
             Py_FinalizeEx();
 
-        wchar_t* path = Py_DecodeLocale(Path.data(), NULL);
-        Py_SetPath(path);
-        PyMem_RawFree(path);
+        PyObject *pSyspath=NULL, *pPath=NULL;
+        pSyspath = PySys_GetObject("path");
+        PyObject_Print(pSyspath, stdout, 0);
+
+        pPath = PyUnicode_FromStringAndSize(Path.data(), Path.length());
+        PyObject_Print(pPath, stdout, 0);
+
+        PyList_Insert(pSyspath, 1, pPath);
+        PySys_SetObject("path", pSyspath);
+
+        pSyspath = PySys_GetObject("path");
+        PyObject_Print(pSyspath, stdout, 0);
+
+        Py_XDECREF(pSyspath);
+        Py_XDECREF(pPath);
 
         Py_Initialize();
     }

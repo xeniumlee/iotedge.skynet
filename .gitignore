@@ -2,10 +2,8 @@
 /bin/
 /release/
 /run/
-/db/
-/log*/
+/logs/
 /config
-/log*
 
 *.a
 *.o

@@ -38,6 +38,12 @@ skynetclean:
 		BUILD_PATH="../$(BUILD_PATH)" \
 		CSERVICE_PATH="../$(BUILD_PATH)"
 
+LUA_ZLIB_BIN = $(BUILD_PATH)/zlib.so
+LUA_ZLIB_SRC = $(LUA_LIB_SRC)/lua-zlib.c
+LUA_ZLIB_CC = $(CC) -O2 -Wall -fPIC -shared
+$(LUA_ZLIB_BIN): $(LUA_ZLIB_SRC)
+	$(LUA_ZLIB_CC) $^ -o $@ -I$(LUA_SRC) -lm -lz
+
 SSL_BIN = $(PREBUILT_PATH)/libssl.a.1.1.1g $(PREBUILT_PATH)/libcrypto.a.1.1.1g
 SSL_SRC = 3rd/openssl-1.1.1g
 LUA_TLS_BIN = $(BUILD_PATH)/ltls.so
@@ -80,9 +86,9 @@ LUA_PYTHON_CXX = $(CXX) -std=$(CXXSTD) -O2 -Wall -pedantic -fPIC -shared -D$(CXX
 $(LUA_PYTHON_BIN): $(LUA_PYTHON_SRC) $(PYTHON_BIN)
 	$(LUA_PYTHON_CXX) $^ -o $@ -I$(LUA_SRC) -I$(PYTHON_SRC) -pthread -lcrypt -ldl -lutil -lm
 
-all: skynet $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
+all: skynet $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN) $(LUA_ZLIB_BIN)
 
 clean:
-	rm -f $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN)
+	rm -f $(LUA_PYTHON_BIN) $(LUA_TLS_BIN) $(LUA_SNAP7_BIN) $(LUA_SERIAL_BIN) $(LUA_OPCUA_BIN) $(LUA_ZLIB_BIN)
 
 cleanall: skynetclean clean

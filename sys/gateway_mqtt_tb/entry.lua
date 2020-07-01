@@ -14,9 +14,6 @@ local log_prefix = ""
 local cocurrency = 5
 local keepalive_timeout = 6000
 
-local sys_uri = ""
-local sys_id = ""
-
 local telemetry_topic = ""
 local telemetry_qos = 1
 local telemetry_pack
@@ -43,6 +40,32 @@ local gresp_qos = 1
 
 local sub_retry_count = 3
 local sub_retry_timeout = 200
+local reconnect_timeout = 200
+local pub_retry_count
+local pub_retry_timeout = 2000
+
+local handler_map = {}
+
+local req_map = {
+    open_console = api.frpappid,
+    close_console = api.frpappid,
+    open_ssh = api.frpappid,
+    close_ssh = api.frpappid,
+    open_vnc = api.frpappid,
+    close_vnc = api.frpappid,
+    vpn_info = api.vpnappid,
+    open_peer = api.vpnappid,
+    close_peer = api.vpnappid,
+    upgrade = api.sysappid
+}
+
+local attributes_map = {
+    [api.infokey] = "edgeinfo",
+    southapps = "southapps",
+    vpn = "vpn",
+    frp = "frp",
+    repo = "repo"
+}
 
 local function ensure_subscribe(cli, topic, qos)
     local done = false
@@ -74,10 +97,6 @@ local function ensure_subscribe(cli, topic, qos)
         end
     end
 end
-
-local reconnect_timeout = 200
-local pub_retry_count
-local pub_retry_timeout = 2000
 
 local function init_pub_retry_count(keepalive, pinglimit)
     -- retry till connection issue detected
@@ -120,86 +139,6 @@ local function ensure_publish(cli, msg, dev)
         end
     end
 end
-
-local function ping(cli)
-    local check_timeout = keepalive_timeout+200
-    while cli.connection do
-        if skynet.now()-cli.comm_time >= keepalive_timeout then
-            cli:send_pingreq()
-        end
-        skynet.sleep(check_timeout)
-    end
-end
-
-local function handle_pinglimit(count, cli)
-    log.error(log_prefix, text.connect_fail)
-    cli:disconnect()
-end
-
-local function handle_error(err)
-    log.error(log_prefix, text.error, err)
-end
-
-local function handle_close(conn)
-    api.offline()
-    log.error(log_prefix, text.close, conn.close_reason)
-end
-
-local function handle_connect(connack, cli)
-    if connack.rc ~= 0 then
-        return
-    end
-    log.info(log_prefix, text.connect_suc)
-
-    api.online()
-    skynet.fork(ping, cli)
-
-    api.sys_request("mqttapp", { uri = sys_uri, id = sys_id })
-    skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
-    skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
-    skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
-end
-
-local command = {}
-function command.stop()
-    running = false
-    local ok, err = client:disconnect()
-    if ok then
-        log.info(log_prefix, text.stop_suc)
-    else
-        log.error(log_prefix, text.stop_fail, err)
-    end
-end
-
-function command.payload(dev, data)
-    local msg = seri.unpack(data)
-    ensure_publish(client, msg, dev)
-end
-
-function command.data(dev, data)
-    if type(dev) ~= "string" or type(data) ~= "table" then
-        log.error(log_prefix, text.invalid_post, "telemetry")
-        return
-    end
-    local payload = telemetry_pack({[dev] = data})
-    if not payload then
-        log.error(log_prefix, text.invalid_post, "telemetry")
-        return
-    end
-    local msg = {}
-    msg.topic = telemetry_topic
-    msg.qos = telemetry_qos
-    msg.payload = payload
-    ensure_publish(client, msg, dev)
-end
-
-local attributes_map = {
-    [api.infokey] = "edgeinfo",
-    southapps = "southapps",
-    vpn = "vpn",
-    frp = "frp",
-    repo = "repo"
-}
 
 local post_map = {
     online = function(dev)
@@ -306,13 +245,42 @@ local post_map = {
     end
 }
 
-function command.post(k, ...)
-    local f = post_map[k]
-    if f then
-        f(...)
-    else
-        log.error(log_prefix, text.invalid_post)
+local function ping(cli)
+    local check_timeout = keepalive_timeout+200
+    while cli.connection do
+        if skynet.now()-cli.comm_time >= keepalive_timeout then
+            cli:send_pingreq()
+        end
+        skynet.sleep(check_timeout)
     end
+end
+
+local function handle_pinglimit(count, cli)
+    log.error(log_prefix, text.connect_fail)
+    cli:disconnect()
+end
+
+local function handle_error(err)
+    log.error(log_prefix, text.error, err)
+end
+
+local function handle_close(conn)
+    api.offline()
+    log.error(log_prefix, text.close, conn.close_reason)
+end
+
+local function handle_connect(connack, cli)
+    if connack.rc ~= 0 then
+        return
+    end
+    log.info(log_prefix, text.connect_suc)
+
+    api.online()
+    skynet.fork(ping, cli)
+
+    skynet.fork(ensure_subscribe, cli, rpc_topic, rpc_qos)
+    skynet.fork(ensure_subscribe, cli, gattributes_topic, gattributes_qos)
+    skynet.fork(ensure_subscribe, cli, greq_topic, greq_qos)
 end
 
 --[[
@@ -499,7 +467,7 @@ local function decode_config(msg)
 end
 
 local function respond_config(key, ok, err)
-    command.post("gattributes", api.iotedgedev, { [key] = { res = ok, err = err } })
+    post_map.gattributes(api.iotedgedev, { [key] = { res = ok, err = err } })
 end
 
 local function handle_config(msg, cli)
@@ -523,19 +491,6 @@ local function handle_config(msg, cli)
         end
     end)
 end
-
-local req_map = {
-    open_console = api.frpappid,
-    close_console = api.frpappid,
-    open_ssh = api.frpappid,
-    close_ssh = api.frpappid,
-    open_vnc = api.frpappid,
-    close_vnc = api.frpappid,
-    vpn_info = api.vpnappid,
-    open_peer = api.vpnappid,
-    close_peer = api.vpnappid,
-    upgrade = api.sysappid
-}
 
 --[[
 msg = {
@@ -614,8 +569,6 @@ local function handle_req(msg, cli)
     end
 end
 
-local handler_map = {}
-
 local function init_seri(topic)
     if topic:match("^.+/zip$") then
         return seri.zpack
@@ -686,61 +639,87 @@ local function handle_request(msg, cli)
     end
 end
 
-local function init()
-    local conf = api.internal_request("conf_get", "gateway_mqtt")
-    if not conf then
-        log.error(text.no_conf)
+function on_exit()
+    running = false
+    local ok, err = client:disconnect()
+    if ok then
+        log.info(log_prefix, text.stop_suc)
     else
-        math.randomseed(skynet.time())
-        log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
-        keepalive_timeout = conf.keep_alive*100
-        seri.init(conf.seri)
-        init_pub_retry_count(keepalive_timeout, conf.ping_limit)
-
-        api.mqtt_init()
-        init_topics(conf.topic)
-        sys_uri = conf.uri
-        sys_id = conf.id
-        cocurrency = conf.cocurrency
-
-        client = mqtt.client {
-            uri = conf.uri,
-            id = conf.id,
-            username = conf.username,
-            password = conf.password,
-            clean = conf.clean,
-            secure = conf.secure,
-            keep_alive = conf.keep_alive,
-            version = conf.version == "v3.1.1" and mqtt.v311 or mqtt.v50,
-            ping_limit = conf.ping_limit
-        }
-        local mqtt_callback = {
-            connect = handle_connect,
-            message = handle_request,
-            error = handle_error,
-            close = handle_close,
-            pinglimit = handle_pinglimit
-        }
-        client:on(mqtt_callback)
-
-        skynet.fork(function()
-            while running do
-                if client.connection then
-                    client:iteration()
-                else
-                    skynet.sleep(reconnect_timeout)
-                    client:start_connecting()
-                end
-            end
-        end)
-
-        skynet.dispatch("lua", function(_, _, cmd, ...)
-            local f = command[cmd]
-            if f then
-                f(...)
-            end
-        end)
+        log.error(log_prefix, text.stop_fail, err)
     end
 end
 
-skynet.start(init)
+function on_payload(dev, data)
+    local msg = seri.unpack(data)
+    ensure_publish(client, msg, dev)
+end
+
+function on_post(k, dev, data)
+    local f = post_map[k]
+    if f then
+        f(dev, data)
+    else
+        log.error(log_prefix, text.invalid_post)
+    end
+end
+
+function on_data(dev, data)
+    if type(dev) ~= "string" or type(data) ~= "table" then
+        log.error(log_prefix, text.invalid_post, "telemetry")
+        return
+    end
+    local payload = telemetry_pack({[dev] = data})
+    if not payload then
+        log.error(log_prefix, text.invalid_post, "telemetry")
+        return
+    end
+    local msg = {}
+    msg.topic = telemetry_topic
+    msg.qos = telemetry_qos
+    msg.payload = payload
+    ensure_publish(client, msg, dev)
+end
+
+function on_conf(conf)
+    math.randomseed(math.floor(skynet.time()))
+    log_prefix = "MQTT client "..conf.id.."("..conf.uri..")"
+    keepalive_timeout = conf.keep_alive*100
+    seri.init(conf.seri)
+    init_pub_retry_count(keepalive_timeout, conf.ping_limit)
+
+    api.mqtt_init()
+    init_topics(conf.topic)
+    cocurrency = conf.cocurrency
+
+    client = mqtt.client {
+        uri = conf.uri,
+        id = conf.id,
+        username = conf.username,
+        password = conf.password,
+        clean = conf.clean,
+        secure = conf.secure,
+        keep_alive = conf.keep_alive,
+        version = conf.version == "v3.1.1" and mqtt.v311 or mqtt.v50,
+        ping_limit = conf.ping_limit
+    }
+    local mqtt_callback = {
+        connect = handle_connect,
+        message = handle_request,
+        error = handle_error,
+        close = handle_close,
+        pinglimit = handle_pinglimit
+    }
+    client:on(mqtt_callback)
+
+    skynet.timeout(0, function()
+        while running do
+            if client.connection then
+                client:iteration()
+            else
+                skynet.sleep(reconnect_timeout)
+                client:start_connecting()
+            end
+        end
+    end)
+    return true
+end

@@ -10,13 +10,16 @@ local log = require "log"
 local sys = require "sys"
 local text = require("text").sysmgr
 
+local sys_root = sys.sys_root
 local app_root = sys.app_root
 local run_root = sys.run_root
-local repo_cfg = sys.repo_cfg
-local pipe_cfg = sys.pipe_cfg
-local meta_lua = sys.meta_lua
-local entry_lua = sys.entry_lua
+local repo_cfg = string.format("%s/%s", run_root, sys.repo_cfg)
+local pipe_cfg = string.format("%s/%s", run_root, sys.pipe_cfg)
+local entry_lua = string.format(sys.prod() and "%s.luac" or "%s.lua", sys.entry_lua)
+local meta_lua = string.format(sys.prod() and "%s.luac" or "%s.lua", sys.meta_lua)
 local gateway_global = sys.gateway_global
+
+local launch_delay = sys.prod() and 6000 or 1
 
 local function backup(from, to)
     local f = io.open(from)
@@ -56,71 +59,25 @@ end
 
 local function load_cfg(file, env)
     local attr = lfs.attributes(file)
-    if attr then
+    if attr and attr.mode == "file" and attr.size ~= 0 then
         local ok, err =  pcall(function()
-            loadfile(file, "bt", env)()
+            loadfile(file, "t", env)()
         end)
         if ok then
             log.info(text.config_load_suc, file)
         else
             log.error(text.config_load_fail, file, err)
-            local bak = bak_file(file)
-            attr = lfs.attributes(bak)
-            if attr then
-                ok, err = pcall(function()
-                    loadfile(bak, "bt", env)()
-                end)
-                if ok then
-                    log.info(text.config_load_suc, bak)
-                else
-                    log.error(text.config_load_fail, bak, err)
-                end
-            end
         end
     end
 end
 
-local function validate_tpl(tpl_dir)
-    local function do_validate(suffix)
-        local attr = lfs.attributes(tpl_dir.."/"..entry_lua..suffix)
-        if attr and attr.mode == "file" and attr.size ~= 0 then
-            local meta = {}
-            load_cfg(tpl_dir.."/"..meta_lua..suffix, meta)
-            if type(meta.conf) == "table" then
-                return meta.conf
-            else
-                return false
-            end
-        else
-            return false
-        end
-    end
-    return do_validate(".luac") or do_validate(".lua")
-end
-
-local function load_tpl(tpls)
-    local conf
-    for dir in lfs.dir(app_root) do
-        if dir ~= "." and dir ~= ".." then
-            if tpls[dir] then
-                log.error(text.dup_tpl, dir)
-            else
-                conf = validate_tpl(app_root.."/"..dir)
-                if conf then
-                    tpls[dir] = conf
-                else
-                    log.error(text.invalid_meta, dir)
-                end
-            end
-        end
-    end
-end
-
-local function validate_app(app_cfg)
-    local attr = lfs.attributes(app_cfg)
+local function validate_tpl(tpl)
+    local entry = string.format("%s/%s", tpl, entry_lua)
+    local attr = lfs.attributes(entry)
     if attr and attr.mode == "file" and attr.size ~= 0 then
+        local meta = string.format("%s/%s", tpl, meta_lua)
         local env = {}
-        load_cfg(app_cfg, env)
+        load_cfg(meta, env)
         if type(env.conf) == "table" then
             return env.conf
         else
@@ -131,40 +88,116 @@ local function validate_app(app_cfg)
     end
 end
 
-local function app_cfg(id, tpl)
-    return run_root.."/"..tpl.."_"..id
+local function validate_app(app)
+    local attr = lfs.attributes(app)
+    if attr and attr.mode == "file" and attr.size ~= 0 then
+        local env = {}
+        load_cfg(app, env)
+        if type(env.conf) == "table" then
+            return env.conf
+        else
+            return false
+        end
+    else
+        return false
+    end
 end
 
-local function app_id_tpl(f)
-    local tpl, idstr = f:match("^(.+)_([%d%l]+)$")
+local function app_id_tpl(app)
+    local tpl, idstr = app:match("^(.+)_([%d%l]+)$")
     local id = tonumber(idstr)
     return id or idstr, tpl
 end
 
-local function load_app(apps)
-    for f in lfs.dir(run_root) do
-        local id, tpl = app_id_tpl(f)
-        if id and tpl then
-            if apps[id] then
-                log.error(text.dup_app, f)
+--------------------- cfg ---------------------
+local cfg = {
+    repo = {},
+    pipes = {},
+    apps = {},
+    tpls = {}
+}
+
+cfg.total = {
+    repo = cfg.repo,
+    pipes = cfg.pipes,
+    apps = cfg.apps
+}
+
+local function do_load_tpl(dir, tpls, unique)
+    for tpl in lfs.dir(dir) do
+        if tpl ~= "." and tpl ~= ".." then
+            if tpls[tpl] then
+                log.error(text.dup_tpl, tpl)
             else
-                local conf = validate_app(run_root.."/"..f)
+                local subdir = string.format("%s/%s", dir, tpl)
+                local conf = validate_tpl(subdir)
                 if conf then
-                    apps[id] = { [tpl] = conf }
+                    tpls[tpl] = {
+                        conf = conf,
+                        unique = unique
+                    }
                 else
-                    log.error(text.invalid_app, f)
+                    log.error(text.invalid_meta, tpl)
                 end
             end
         end
     end
 end
 
-local cfg = {
-    repo = false,
-    pipes = {},
-    apps = {},
-    tpls = {}
-}
+local function load_tpl()
+    do_load_tpl(app_root, cfg.tpls, false)
+end
+
+local function load_systpl()
+    do_load_tpl(sys_root, cfg.tpls, true)
+end
+
+local function load_app()
+    local dir = run_root
+    local apps = cfg.apps
+    for app in lfs.dir(dir) do
+        local id, tpl = app_id_tpl(app)
+        if id and tpl then
+            if apps[id] then
+                log.error(text.dup_app, app)
+            else
+                local f = string.format("%s/%s", dir, app)
+                local conf = validate_app(f)
+                if conf then
+                    apps[id] = { [tpl] = conf }
+                else
+                    log.error(text.invalid_app, app)
+                end
+            end
+        end
+    end
+end
+
+local function load_sysapp()
+    local apps = cfg.apps
+    local tpls = cfg.tpls
+    local auth_enabled = cfg.auth.enabled
+    for id, app in pairs(cfg.sysapp) do
+        tpls[app.tpl].read_only = app.read_only
+
+        if app.enabled and not apps[id] then
+            apps[id] = { [app.tpl] = app.conf or {} }
+        end
+    end
+end
+
+local function load_syspipe()
+    local pipes = cfg.pipes
+    for id, apps in pairs(cfg.syspipe) do
+        pipes[id] = { apps = apps }
+    end
+end
+
+local function load_auth()
+    local auth = cfg.auth
+    auth.salt = crypt.randomkey()
+    auth.password = crypt.hmac_sha1(auth.password, auth.salt)
+end
 
 local function load_all()
     pcall(lfs.mkdir, app_root)
@@ -174,11 +207,17 @@ local function load_all()
     load_cfg(repo_cfg, cfg)
     load_cfg(pipe_cfg, cfg)
 
-    load_app(cfg.apps)
-    load_tpl(cfg.tpls)
+    load_tpl()
+    load_app()
+
+    load_systpl()
+    load_sysapp()
+    load_syspipe()
+
+    load_auth()
 end
 
-local userpass
+--------------------- command ---------------------
 local command = {}
 
 function command.auth(arg)
@@ -186,7 +225,7 @@ function command.auth(arg)
     local password = arg[2]
     if type(username) == "string" and type(password) == "string" then
         return md5.sumhexa(username) == cfg.auth.username and
-        crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == userpass
+        crypt.hmac_sha1(md5.sumhexa(password), cfg.auth.salt) == cfg.auth.password
     else
         return false
     end
@@ -196,8 +235,8 @@ function command.update_app(arg)
     local id = arg[1]
     local tpl = arg[2]
     local conf = arg[3]
+    local f = string.format("%s/%s_%s", run_root, tpl, id)
     if conf then
-        local f = app_cfg(id, tpl)
         local ok, err = save_cfg(f, "conf", conf)
         if ok then
             cfg.apps[id] = { [tpl] = conf }
@@ -208,7 +247,6 @@ function command.update_app(arg)
     else
         local app = cfg.apps[id]
         if app then
-            local f = app_cfg(id, tpl)
             os.remove(f)
             os.remove(bak_file(f))
             cfg.apps[id] = nil
@@ -220,7 +258,7 @@ function command.update_app(arg)
     end
 end
 
-function command.update_pipes(list)
+function command.update_pipe(list)
     if next(list) then
         local ok, err = save_cfg(pipe_cfg, "pipes", list)
         if ok then
@@ -238,16 +276,8 @@ function command.update_pipes(list)
     end
 end
 
-local function total_conf()
-    return { repo = cfg.repo, apps = cfg.apps, pipes = cfg.pipes }
-end
-
-function command.conf_get(key)
-    if key == "total" then
-        return total_conf()
-    else
-        return cfg[key]
-    end
+function command.get_conf(key)
+    return cfg[key]
 end
 
 function command.install_tpl(name)
@@ -257,7 +287,7 @@ function command.install_tpl(name)
         return false, text.download_fail
     end
     return pcall(function()
-        local dir = app_root.."/"..name
+        local dir = string.format("%s/%s", app_root, name)
         local attr = lfs.attributes(dir)
         if attr then
             os.remove(dir)
@@ -282,7 +312,7 @@ function command.install_tpl(name)
             error(text.invalid_meta)
         end
 
-        return conf
+        return { conf = conf }
     end)
 end
 
@@ -310,29 +340,22 @@ local function cluster_reload(c, port)
 end
 
 local function configure(port, conf)
-    local peer = cluster_reload(cluster, port)
-    local g = "@"..gateway_global
+    return pcall(function()
+        local peer = cluster_reload(cluster, port)
+        local g = "@"..gateway_global
 
-    local info, err = cluster.call(peer, g, "sys", "info")
-    if info then
-        local ok
-        ok, err = cluster.call(peer, g, "sys", "configure", conf)
+        local ok, err = cluster.call(peer, g, "sys", "info")
         if ok then
-            return ok
+            ok, err = cluster.call(peer, g, "sys", "configure", conf)
+            if ok then
+                return ok
+            else
+                error(err)
+            end
         else
             error(err)
         end
-    else
-        error(err)
-    end
-end
-
-local function launch_delay()
-    if sys.prod() then
-        skynet.sleep(6000) -- delayed for wan up
-    else
-        skynet.sleep(1) -- delayed for logger up
-    end
+    end)
 end
 
 local function clean_delay()
@@ -350,7 +373,7 @@ function command.upgrade(version)
         return false, text.download_fail
     end
 
-    local t_dir = "../"..sys.core_name(version)
+    local t_dir = string.format("../%s", sys.core_name(version))
     local ok, ret = pcall(function()
         local f = io.open(tarball, "w")
         f:write(tar)
@@ -370,25 +393,15 @@ function command.upgrade(version)
         end
     end)
     if ok then
-        local c_total = skynet.unpack(skynet.pack(total_conf()))
+        local c_total = skynet.unpack(skynet.pack(cfg.total))
         skynet.timeout(0, function()
             local c_dir = lfs.currentdir()
             local c_conf = skynet.getenv("cfg")
             local t_port = cluster_port() + 1
 
-            skynet.call(cfg.appmgr, "lua", "clean", true)
+            api.sys_request("stop")
             skynet.send(cfg.store, "lua", "stop")
-            skynet.send(cfg.gateway_console, "lua", "stop")
 
-            if cfg.ws_proxy.enabled then
-                skynet.send(cfg.ws_proxy.addr, "lua", "stop")
-            end
-            if cfg.gateway_ws.enabled then
-                skynet.send(cfg.gateway_ws.addr, "lua", "stop")
-            end
-            if cfg.gateway_mqtt then
-                skynet.send(cfg.gateway_mqtt.addr, "lua", "stop")
-            end
             clean_delay()
 
             lfs.chdir(t_dir)
@@ -402,7 +415,7 @@ function command.upgrade(version)
             upgrade_delay()
 
             local err
-            ok, err = pcall(configure, t_port, c_total)
+            ok, err = configure(t_port, c_total)
             if ok then
                 log.info(text.sys_exit)
             else
@@ -418,30 +431,21 @@ function command.upgrade(version)
     end
 end
 
-local function init_auth()
-    cfg.auth.salt = crypt.randomkey()
-    userpass = crypt.hmac_sha1(cfg.auth.password, cfg.auth.salt)
-end
-
 local cmd_desc = {
-    update_pipes = true,
+    update_pipe = true,
     update_app = true,
     update_repo = true,
     install_tpl = true,
-    conf_get = true,
+    get_conf = true,
     upgrade = true,
     auth = true
 }
 
 local function launch()
-    launch_delay()
-
-    load_all()
-    init_auth()
     log.info("System starting")
+    load_all()
 
-    local s = skynet.self()
-    local g = skynet.uniqueservice("gateway", s)
+    local g = skynet.uniqueservice("gateway", cfg.gateway.flowcontrol, tostring(cfg.gateway.audit))
     skynet.name(api.gateway_addr, g)
     cluster.register(gateway_global, g)
     cluster.open(cluster_reload(cluster, cluster_port()))
@@ -453,36 +457,7 @@ local function launch()
     skynet.name(api.store_addr, cfg.store)
     log.info("Store started")
 
-    cfg.gateway_console = skynet.uniqueservice(
-        "gateway_console",
-        sys.console_port,
-        tostring(cfg.auth.enabled))
-    log.info("Console started")
-
-    if cfg.gateway_mqtt then
-        local c = cfg.gateway_mqtt.tpl
-        cfg.gateway_mqtt.addr = skynet.uniqueservice(c)
-        log.info("MQTT started", c)
-    end
-
-    if cfg.gateway_ws.enabled then
-        cfg.gateway_ws.addr = skynet.uniqueservice(
-            "gateway_ws",
-            sys.ws_port,
-            tostring(cfg.auth.enabled))
-        log.info("Websocket started")
-    end
-
-    if cfg.ws_proxy.enabled then
-        cfg.ws_proxy.addr = skynet.uniqueservice(
-            "ws_proxy",
-            sys.ws_proxy_port)
-        log.info("Websocket proxy started")
-    end
-
-    cfg.appmgr = skynet.uniqueservice(true, "appmgr",
-        cfg.gateway_ws.enabled and cfg.gateway_ws.addr or sys.invalid_addr,
-        cfg.gateway_mqtt and cfg.gateway_mqtt.addr or sys.invalid_addr)
+    cfg.appmgr = skynet.uniqueservice(true, "appmgr")
     skynet.monitor("appmgr", true)
     log.info("Monitor started")
 
@@ -498,5 +473,5 @@ skynet.start(function()
             skynet.ret(skynet.pack(false, text.unknown_cmd))
         end
     end)
-    skynet.fork(launch)
+    skynet.timeout(launch_delay, launch)
 end)

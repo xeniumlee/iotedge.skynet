@@ -6,7 +6,6 @@ sys = {
     cluster = 30002
 }
 auth = {
-    enabled = true,
     username = '9c1d55b6274a7456540ec64bb39cd604',
     password = 'c41441edb82f7d3461925a3385c98501',
 }
@@ -14,65 +13,60 @@ gateway = {
     flowcontrol = 10,
     audit = true
 }
-gateway_ws = {
-    enabled = false
-}
-ws_proxy = {
-    enabled = false
-}
-gateway_mqtt = {
-    tpl = 'gateway_mqtt_tb',
-    id = 'MQTT_ID',
-    uri = 'MQTT_URI',
-    username = 'MQTT_USERNAME',
-    password = 'MQTT_PASSWORD',
-    topic = {
-        connect = {
-            qos = 1,
-            txt = 'v1/gatewayhub/connect'
-        },
-        disconnect = {
-            qos = 1,
-            txt = 'v1/gatewayhub/disconnect'
-        },
-        rpc = {
-            qos = 1,
-            txt = 'v1/gatewayhub/rpc'
-        },
-        telemetry = {
-            qos = 1,
-            txt = 'v1/gatewayhub/telemetry/zip'
-        },
-        teleindication = {
-            qos = 1,
-            txt = 'v1/gatewayhub/teleindication'
-        },
-        attributes = {
-            qos = 1,
-            txt = 'v1/gatewayhub/attributes/zip'
-        },
-        gattributes = {
-            qos = 1,
-            txt = 'v1/devicehub/attributes'
-        },
-        gtelemetry = {
-            qos = 1,
-            txt = 'v1/devicehub/telemetry/zip'
-        },
-        greq = {
-            qos = 1,
-            txt = 'v1/devicehub/rpc/request/+'
-        },
-        gresp = {
-            qos = 1,
-            txt = 'v1/devicehub/rpc/response'
+sysapp = {
+    gateway_console = {
+        tpl = "gateway_console",
+        enabled = true,
+        read_only = true,
+        conf = {
+            auth_enabled = true,
         }
     },
-    version = 'v3.1.1',
-    clean = true,
-    secure = true,
-    keep_alive = 60,
-    ping_limit = 3,
-    seri = 'json',
-    cocurrency = 5
+    mqtt = {
+        tpl = 'gateway_mqtt_tb',
+        enabled = true,
+        read_only = true,
+        conf = {
+            id = 'MQTT_ID',
+            uri = 'MQTT_URI',
+            username = 'MQTT_USERNAME',
+            password = 'MQTT_PASSWORD',
+        }
+    },
+    host = {
+        tpl = "host",
+        enabled = true,
+        read_only = true,
+    },
+    frp = {
+        tpl = "frp",
+        enabled = true,
+        read_only = false,
+    },
+    vpn = {
+        tpl = "vpn",
+        enabled = true,
+        read_only = false,
+    },
+    python = {
+        tpl = "python",
+        enabled = true,
+        read_only = false,
+    },
+    ws = {
+        tpl = "gateway_ws",
+        enabled = false,
+        read_only = true,
+        conf = {
+            auth_enabled = true,
+        }
+    },
+    ws_proxy = {
+        tpl = "ws_proxy",
+        enabled = false,
+        read_only = true,
+    }
+}
+syspipe = {
+    host = { "host", "mqtt" }
 }

@@ -9,7 +9,7 @@ local text = require("text").store
 local applist = {}
 local devlist = {}
 
-local db_root = sys.db_root
+local db_root = string.format("%s/%s", sys.run_root, sys.db_root)
 
 local open_f = sqlite3.OPEN_READWRITE +
                sqlite3.OPEN_URI +
@@ -252,7 +252,7 @@ function command.dev_online(addr, dev, ttl)
 end
 
 skynet.start(function()
-    math.randomseed(skynet.time())
+    math.randomseed(math.floor(skynet.time()))
     pcall(lfs.mkdir, db_root)
     skynet.dispatch("lua", function(session, addr, cmd, ...)
         local f = command[cmd]
