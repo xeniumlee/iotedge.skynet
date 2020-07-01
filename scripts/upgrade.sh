@@ -10,16 +10,16 @@ REV=${REVPLAT%-*}
 PLAT=${REVPLAT#*-}
 
 mkdir -p ./run
-rm -f ./run/*
+rm -rf ./run/*
 cp -rf ${DIR}/run/db ./run/
 if [ -f ${DIR}/run/frpc.ini ]; then
     cp -f ${DIR}/run/frpc.ini ./run/
 fi
 
-LUA=skynet/3rd/lua/lua
+LUA=$(dirname $0)/../skynet/3rd/lua/lua
 
 if [ ${CONFIG} = "config.tb" ]; then
-    local STAT="local env = {} \
+    STAT="local env = {} \
           loadfile('${DIR}/${CONFIG}', 't', env)() \
           local conf = env.sysapp.mqtt.conf
           print(string.format('%s %s %s %s', \
@@ -27,11 +27,11 @@ if [ ${CONFIG} = "config.tb" ]; then
                               conf.id, \
                               conf.uri, \
                               conf.username))"
-    local RET=$(${LUA} -e "${STAT}")
-    local HOST=$(echo $RET | cut -f1 -d' ')
-    local NAME=$(echo $RET | cut -f2 -d' ')
-    local URI=$(echo $RET | cut -f3 -d' ')
-    local TOKEN=$(echo $RET | cut -f4 -d' ')
+    RET=$(${LUA} -e "${STAT}")
+    HOST=$(echo $RET | cut -f1 -d' ')
+    NAME=$(echo $RET | cut -f2 -d' ')
+    URI=$(echo $RET | cut -f3 -d' ')
+    TOKEN=$(echo $RET | cut -f4 -d' ')
 
     sed -i "s|SYS_VERSION|${REV}|; \
             s|SYS_PLAT|${PLAT}|; \

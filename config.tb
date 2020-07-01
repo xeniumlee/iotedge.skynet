@@ -49,7 +49,7 @@ sysapp = {
     },
     python = {
         tpl = "python",
-        enabled = true,
+        enabled = false,
         read_only = false,
     },
     ws = {
