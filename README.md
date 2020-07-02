@@ -84,11 +84,11 @@ make LUA_VERSION=5.4 LUA_INCLUDE_DIR=../iotedge/skynet/3rd/lua
 * telnet localhost 30000
 * Type help
 ### Production
-* ./dev/release.sh *<x86_64|arm_v7>* *<host:path>*
-* ./scripts/install.sh install config.tb *<host>* *<id>* *<uri>* *<username>*
+* ./dev/release.sh *<x86_64|arm_v7> <host:path>*
+* ./scripts/install.sh install config.tb *<host> <id> <uri> <username>*
 * ./scripts/install.sh install config.local *<host>*
-* ./scripts/install.sh upgrade config.tb *<dir>* *<port>*
-* ./scripts/install.sh upgrade config.local *<dir>* *<port>*
+* ./scripts/install.sh upgrade config.tb *<dir> <port>*
+* ./scripts/install.sh upgrade config.local *<dir> <port>*
 ## Dependences
 * github.com/cloudwu/lua-cjson
 * github.com/keplerproject/luafilesystem
