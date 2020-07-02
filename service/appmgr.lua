@@ -265,6 +265,7 @@ local function configure_external(c)
         local tpl, conf = next(app)
 
         if applist[id] then
+        -- sysapp
             if not readonly_app(tpl) then
                 conf = clone(applist[id].conf, conf)
                 ok, err = configure_app(id, conf)
@@ -275,6 +276,7 @@ local function configure_external(c)
                 end
             end
         else
+        -- normal app
             ok, err = load_app(id, tpl)
             if ok then
                 conf = clone(tpllist[tpl].conf, conf)
@@ -306,20 +308,6 @@ local function configure_external(c)
 end
 
 local function configure_internal(c)
-    for id, app in pairs(c.apps) do
-        local tpl, conf = next(app)
-        local ok = load_app(id, tpl)
-        if ok then
-            conf = clone(tpllist[tpl].conf, conf)
-            configure_app(id, conf)
-        end
-    end
-    for id, pipe in pairs(c.pipes) do
-        local ok = load_pipe(id, pipe.apps)
-        if ok then
-            try_start_pipe(id, pipe.auto)
-        end
-    end
 end
 
 local cmd_desc = {
@@ -337,18 +325,34 @@ local cmd_desc = {
 }
 
 local function load_all()
-    api.sys_init(cmd_desc)
-
     sysinfo.sys = api.internal_request("get_conf", "sys")
     sysinfo.sys.up = api.datetime(skynet.starttime())
 
     tpllist = api.internal_request("get_conf", "tpls")
-    local total = api.internal_request("get_conf", "total")
-    sysinfo.sys.repo = total.repo.uri
 
-    configure_internal(total)
+    local repo = api.internal_request("get_conf", "repo")
+    sysinfo.sys.repo = repo.uri
+
+    local apps = api.internal_request("get_conf", "apps")
+    for id, app in pairs(apps) do
+        local tpl, conf = next(app)
+        local ok = load_app(id, tpl)
+        if ok then
+            conf = clone(tpllist[tpl].conf, conf)
+            configure_app(id, conf)
+        end
+    end
+
+    local pipes = api.internal_request("get_conf", "pipes")
+    for id, pipe in pairs(pipes) do
+        local ok = load_pipe(id, pipe.apps)
+        if ok then
+            try_start_pipe(id, pipe.auto)
+        end
+    end
 
     refresh_info()
+    api.sys_init(cmd_desc)
     locked = false
 end
 
@@ -369,6 +373,24 @@ function command.stop()
     end
     log.info(text.cleaned)
     return true
+end
+
+local function validate_appname(name)
+    if applist[name] then
+        return true, name, applist[name].tpl
+    else
+        if type(name) == "string" then
+            local tpl, id = name:match("^(.+)_(%d+)$")
+            id = tonumber(id)
+            if tpllist[tpl] and applist[id] then
+                return true, id, tpl
+            else
+                return false, text.unknown_app
+            end
+        else
+            return false, text.unknown_app
+        end
+    end
 end
 
 local function validate_repo(repo)
@@ -397,24 +419,6 @@ local function validate_repo(repo)
 
         sysinfo.sys.repo = repo.uri
     end)
-end
-
-local function validate_appname(name)
-    if applist[name] then
-        return true, name, applist[name].tpl
-    else
-        if type(name) == "string" then
-            local tpl, id = name:match("^(.+)_(%d+)$")
-            id = tonumber(id)
-            if tpllist[tpl] and applist[id] then
-                return true, id, tpl
-            else
-                return false, text.unknown_app
-            end
-        else
-            return false, text.unknown_app
-        end
-    end
 end
 
 local function validate_appconf(arg)

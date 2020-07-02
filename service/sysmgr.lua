@@ -9,14 +9,15 @@ local http = require "utils.http"
 local log = require "log"
 local sys = require "sys"
 local text = require("text").sysmgr
+local strfmt = string.format
 
 local sys_root = sys.sys_root
 local app_root = sys.app_root
 local run_root = sys.run_root
-local repo_cfg = string.format("%s/%s", run_root, sys.repo_cfg)
-local pipe_cfg = string.format("%s/%s", run_root, sys.pipe_cfg)
-local entry_lua = string.format(sys.prod() and "%s.luac" or "%s.lua", sys.entry_lua)
-local meta_lua = string.format(sys.prod() and "%s.luac" or "%s.lua", sys.meta_lua)
+local repo_cfg = strfmt("%s/%s", run_root, sys.repo_cfg)
+local pipe_cfg = strfmt("%s/%s", run_root, sys.pipe_cfg)
+local entry_lua = strfmt(sys.prod() and "%s.luac" or "%s.lua", sys.entry_lua)
+local meta_lua = strfmt(sys.prod() and "%s.luac" or "%s.lua", sys.meta_lua)
 local gateway_global = sys.gateway_global
 
 local launch_delay = sys.prod() and 6000 or 1
@@ -72,10 +73,10 @@ local function load_cfg(file, env)
 end
 
 local function validate_tpl(tpl)
-    local entry = string.format("%s/%s", tpl, entry_lua)
+    local entry = strfmt("%s/%s", tpl, entry_lua)
     local attr = lfs.attributes(entry)
     if attr and attr.mode == "file" and attr.size ~= 0 then
-        local meta = string.format("%s/%s", tpl, meta_lua)
+        local meta = strfmt("%s/%s", tpl, meta_lua)
         local env = {}
         load_cfg(meta, env)
         if type(env.conf) == "table" then
@@ -123,7 +124,7 @@ local function do_load_tpl(dir, tpls, unique)
             if tpls[tpl] then
                 log.error(text.dup_tpl, tpl)
             else
-                local subdir = string.format("%s/%s", dir, tpl)
+                local subdir = strfmt("%s/%s", dir, tpl)
                 local conf = validate_tpl(subdir)
                 if conf then
                     tpls[tpl] = {
@@ -155,7 +156,7 @@ local function load_app()
             if apps[id] then
                 log.error(text.dup_app, app)
             else
-                local f = string.format("%s/%s", dir, app)
+                local f = strfmt("%s/%s", dir, app)
                 local conf = validate_app(f)
                 if conf then
                     apps[id] = { [tpl] = conf }
@@ -209,12 +210,6 @@ local function load_all()
     load_syspipe()
 
     load_auth()
-
-    cfg.total = {
-        repo = cfg.repo,
-        pipes = cfg.pipes,
-        apps = cfg.apps
-    }
 end
 
 --------------------- command ---------------------
@@ -235,7 +230,7 @@ function command.update_app(arg)
     local id = arg[1]
     local tpl = arg[2]
     local conf = arg[3]
-    local f = string.format("%s/%s_%s", run_root, tpl, id)
+    local f = strfmt("%s/%s_%s", run_root, tpl, id)
     if conf then
         local ok, err = save_cfg(f, "conf", conf)
         if ok then
@@ -287,7 +282,7 @@ function command.install_tpl(name)
         return false, text.download_fail
     end
     return pcall(function()
-        local dir = string.format("%s/%s", app_root, name)
+        local dir = strfmt("%s/%s", app_root, name)
         local attr = lfs.attributes(dir)
         if attr then
             os.remove(dir)
@@ -373,8 +368,8 @@ function command.upgrade(version)
         return false, text.download_fail
     end
 
-    local t_dir = string.format("../%s", sys.core_name(version))
-    local ok, ret = pcall(function()
+    local t_dir = strfmt("../%s", sys.core_name(version))
+    local ok, err = pcall(function()
         local f = io.open(tarball, "w")
         f:write(tar)
         f:close()
@@ -393,7 +388,6 @@ function command.upgrade(version)
         end
     end)
     if ok then
-        local c_total = skynet.unpack(skynet.pack(cfg.total))
         skynet.timeout(0, function()
             local c_dir = lfs.currentdir()
             local c_conf = skynet.getenv("cfg")
@@ -405,7 +399,7 @@ function command.upgrade(version)
             clean_delay()
 
             lfs.chdir(t_dir)
-            ok = sys.upgrade(c_dir, c_conf, t_port)
+            ok = sys.upgrade(c_conf, c_dir, t_port)
             lfs.chdir(c_dir)
             if not ok then
                 log.error(text.install_fail)
@@ -414,7 +408,7 @@ function command.upgrade(version)
 
             upgrade_delay()
 
-            local err
+            local c_total = { repo = cfg.repo, apps = cfg.apps, pipes = cfg.pipes }
             ok, err = configure(t_port, c_total)
             if ok then
                 log.info(text.sys_exit)
@@ -427,7 +421,7 @@ function command.upgrade(version)
             end)
         return ok
     else
-        return ok, ret
+        return ok, err
     end
 end
 

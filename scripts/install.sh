@@ -1,59 +1,36 @@
 #!/bin/sh
 set -e
 
-CONFIG=$1
-HOST=$2
-NAME=$3
-TOKEN=$4
-URI=$5
-
-if [ ! -f ${CONFIG} ]; then
-    echo "${CONFIG} does not exist"
-    exit 1
-fi
-
-REVPLAT=$(cat PLATFORM)
-REV=${REVPLAT%-*}
-PLAT=${REVPLAT#*-}
-
-if [ ${CONFIG} = "config.tb" ]; then
-    if [ -z "${HOST}" ] || \
-       [ -z "${NAME}" ] || \
-       [ -z "${TOKEN}" ] || \
-       [ -z "${URI}" ]; then
-        echo "$0 <config> <host> <name> <token> <uri>"
-        exit 1
-    fi
-    sed -i "s|SYS_VERSION|${REV}|; \
-            s|SYS_PLAT|${PLAT}|; \
-            s|SYS_HOST|${HOST}|; \
-            s|SYS_ID|${NAME}|; \
-            s|MQTT_ID|${NAME}|; \
-            s|MQTT_USERNAME|${TOKEN}|; \
-            s|MQTT_URI|${URI}|" ${CONFIG}
-elif [ ${CONFIG} = "config.local" ]; then
-    sed -i "s|SYS_VERSION|${REV}|; \
-            s|SYS_PLAT|${PLAT}|" ${CONFIG}
-fi
-
-sed -i "s|config|${CONFIG}|" iotedge.config.prod
-
 install() {
     local UNIT_FILE=/etc/systemd/system/$2
-    cp -f $1 ${UNIT_FILE}
+    cp -f $1/$2 ${UNIT_FILE}
     sed -i "s|WORKING_DIR|${PWD}|g" ${UNIT_FILE}
 }
 
-CORE_SERVICE=iotedge-${REV}.service
-NODE_SERVICE=nodeexporter.service
-FRP_SERVICE=frpc.service
-VPN_SERVICE=vpn.service
+start() {
+    local CORE_SERVICE=iotedge.service
+    local NODE_SERVICE=nodeexporter.service
+    local FRP_SERVICE=frpc.service
+    local VPN_SERVICE=vpn.service
 
-install ./scripts/iotedge.service ${CORE_SERVICE}
-install ./sys/host/${NODE_SERVICE} ${NODE_SERVICE}
-install ./sys/frp/${FRP_SERVICE} ${FRP_SERVICE}
-install ./sys/vpn/${VPN_SERVICE} ${VPN_SERVICE}
+    install ${ROOT}/scripts ${CORE_SERVICE}
+    install ${ROOT}/sys/host ${NODE_SERVICE}
+    install ${ROOT}/sys/frp ${FRP_SERVICE}
+    install ${ROOT}/sys/vpn ${VPN_SERVICE}
 
-systemctl daemon-reload
-systemctl enable ${CORE_SERVICE}
-systemctl restart ${CORE_SERVICE}
+    systemctl daemon-reload
+    systemctl enable ${CORE_SERVICE}
+    systemctl restart ${CORE_SERVICE}
+}
+
+ROOT=$(dirname $0)/..
+LUA=${ROOT}/bin/prebuilt/lua
+
+RET=$(${LUA} ${ROOT}/scripts/configure.lua $@)
+
+if [ ${RET} = "ok" ]; then
+    start
+else
+    echo ${RET}
+    exit 1
+fi

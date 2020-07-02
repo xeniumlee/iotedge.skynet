@@ -1,7 +1,7 @@
 local skynet = require "skynet"
 local dns = require "skynet.dns"
 
-local upgrade_cmd = "scripts/upgrade.sh"
+local install_cmd = "scripts/install.sh"
 local uninstall_cmd = "scripts/uninstall.sh"
 
 local function execute(cmd)
@@ -93,8 +93,8 @@ function sys.unzip(f, dir)
     return execute("tar -C "..dir.." -xzf "..f)
 end
 
-function sys.upgrade(dir, config, port)
-    return execute(table.concat({upgrade_cmd, dir, config, port}, " "))
+function sys.upgrade(config, dir, port)
+    return execute(table.concat({install_cmd, "upgrade", config, dir, port}, " "))
 end
 
 function sys.core_name(version)

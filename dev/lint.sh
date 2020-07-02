@@ -28,4 +28,4 @@ LUA=${ROOT}/skynet/3rd/lua/lua
 export LUA_CPATH="${ROOT}/bin/?.so;${ROOT}/bin/prebuilt/?.so"
 export LUA_PATH="${ROOT}/3rd/?.lua;${ROOT}/3rd/?/init.lua"
 
-${LUA} ${ROOT}/3rd/luacheck/main.lua --config ${ROOT}/dev/luacheckrc $DIRS
+${LUA} ${ROOT}/3rd/luacheck/main.lua --config ${ROOT}/dev/luacheckrc $DIRS scripts
