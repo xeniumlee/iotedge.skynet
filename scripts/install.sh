@@ -28,8 +28,9 @@ LUA=${ROOT}/bin/prebuilt/lua
 
 RET=$(${LUA} ${ROOT}/scripts/configure.lua $@)
 
-if [ ${RET} = "ok" ]; then
+if [ "${RET}" = "ok" ]; then
     start
+    echo "done"
 else
     echo ${RET}
     exit 1

@@ -73,7 +73,7 @@ local function upgrade(config, from_dir, port)
     assert(c_conf)
 
     init_sys(c_conf, from_conf.sys.host, from_conf.sys.id, port)
-    init_mqtt(c_conf, from_conf.sysapps.mqtt and from_conf.sysapp.mqtt.conf or nil)
+    init_mqtt(c_conf, from_conf.sysapp.mqtt and from_conf.sysapp.mqtt.conf or nil)
     save_config(c_conf)
 
     file = strfmt("%s/run/frpc.ini", from_dir)
@@ -98,7 +98,7 @@ end
 local action, config = ...
 if action == "install" then
     if config == "config.tb" then
-        local host, mqtt_id, mqtt_uri, mqtt_username = select(2, ...)
+        local host, mqtt_id, mqtt_uri, mqtt_username = select(3, ...)
         if mqtt_id and mqtt_uri and mqtt_username then
             local mqtt_conf = {
                 id = mqtt_id,
@@ -115,7 +115,7 @@ if action == "install" then
             print(strfmt("invalid arguments: %s %s", action, config))
         end
     elseif config == "config.local" then
-        local host = select(2, ...)
+        local host = select(3, ...)
         if host then
             local ok, err = pcall(install, config, host)
             if ok then
@@ -131,7 +131,7 @@ if action == "install" then
     end
 
 elseif action == "upgrade" then
-    local from_dir, port = select(2, ...)
+    local from_dir, port = select(3, ...)
     if config and from_dir and port then
         local ok, err = pcall(upgrade, config, from_dir, port)
         if ok then
