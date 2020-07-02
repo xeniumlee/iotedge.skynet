@@ -4,6 +4,7 @@
 /run/
 /logs/
 /config
+/PLATFORM
 
 *.a
 *.o
