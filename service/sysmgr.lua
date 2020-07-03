@@ -61,7 +61,7 @@ local function load_cfg(file, env)
     local attr = lfs.attributes(file)
     if attr and attr.mode == "file" and attr.size ~= 0 then
         local ok, err =  pcall(function()
-            loadfile(file, "t", env)()
+            loadfile(file, "bt", env)()
         end)
         if ok then
             log.info(text.config_load_suc, file)
