@@ -265,7 +265,6 @@ local function configure_external(c)
         local tpl, conf = next(app)
 
         if applist[id] then
-        -- sysapp
             if not readonly_app(tpl) then
                 conf = clone(applist[id].conf, conf)
                 ok, err = configure_app(id, conf)
@@ -276,13 +275,14 @@ local function configure_external(c)
                 end
             end
         else
-        -- normal app
             ok, err = load_app(id, tpl)
             if ok then
                 conf = clone(tpllist[tpl].conf, conf)
                 ok, err = configure_app(id, conf)
                 if ok then
-                    update_app(id)
+                    if not readonly_app(tpl) then
+                        update_app(id)
+                    end
                 else
                     return ok, err
                 end

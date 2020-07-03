@@ -40,11 +40,11 @@ if [ -n "${PLAT}" ]; then
         INFO=PLATFORM
         echo -n ${REV}-${PLAT} > ${INFO}
 
-        LUADIRS="lualib skynet/lualib service skynet/service sys"
+        LUADIRS="lualib skynet/lualib service skynet/service sys scripts"
         compile ${LUADIRS}
 
         TARBALL=${RELEASE_DIR}/${REV}.tar.gz
-        DIRS="${INFO} bin config.* scripts iotedge.config.prod"
+        DIRS="${INFO} bin config.* iotedge.config.prod"
 
         tar --transform="s|bin/skynet$|bin/iotedge|" \
             --transform="s|^|iotedge-${REV}/|" \

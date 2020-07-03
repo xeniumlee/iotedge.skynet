@@ -22,6 +22,7 @@ local sys = {
     app_root = "app",
     run_root = "run",
     db_root = "db",
+    sys_cfg = "config",
     repo_cfg = "repo",
     pipe_cfg = "pipe",
     meta_lua = "meta",
@@ -153,14 +154,9 @@ function sys.stop_svc(svc)
 end
 
 function sys.start_svc(svc)
-    local ok, ret = handle_svc("status", svc)
-    if ok then
-        return ok, ret
-    else
-        handle_svc("restart", svc)
-        skynet.sleep(20)
-        return handle_svc("status", svc)
-    end
+    handle_svc("restart", svc)
+    skynet.sleep(20)
+    return handle_svc("status", svc)
 end
 
 function sys.reload_svc(svc)

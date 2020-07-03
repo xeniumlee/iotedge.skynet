@@ -3,6 +3,7 @@ sys = {
     release = 'SYS_VERSION',
     platform = 'SYS_PLAT',
     host = 'SYS_HOST',
+    config = 'SYS_CONFIG',
     cluster = 30002
 }
 auth = {

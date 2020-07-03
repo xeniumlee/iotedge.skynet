@@ -11,7 +11,6 @@ local sys = require "sys"
 local text = require("text").sysmgr
 local strfmt = string.format
 
-local sys_root = sys.sys_root
 local app_root = sys.app_root
 local run_root = sys.run_root
 local repo_cfg = strfmt("%s/%s", run_root, sys.repo_cfg)
@@ -144,7 +143,7 @@ local function load_tpl()
 end
 
 local function load_systpl()
-    do_load_tpl(sys_root, cfg.tpls, true)
+    do_load_tpl(sys.sys_root, cfg.tpls, true)
 end
 
 local function load_app()
@@ -198,7 +197,7 @@ local function load_all()
     pcall(lfs.mkdir, app_root)
     pcall(lfs.mkdir, run_root)
 
-    load_cfg(skynet.getenv("cfg"), cfg)
+    load_cfg(sys.sys_cfg, cfg)
     load_cfg(repo_cfg, cfg)
     load_cfg(pipe_cfg, cfg)
 
@@ -390,7 +389,6 @@ function command.upgrade(version)
     if ok then
         skynet.timeout(0, function()
             local c_dir = lfs.currentdir()
-            local c_conf = skynet.getenv("cfg")
             local t_port = cluster_port() + 1
 
             api.sys_request("stop")
@@ -399,7 +397,7 @@ function command.upgrade(version)
             clean_delay()
 
             lfs.chdir(t_dir)
-            ok = sys.upgrade(c_conf, c_dir, t_port)
+            ok = sys.upgrade(cfg.sys.config, c_dir, t_port)
             lfs.chdir(c_dir)
             if not ok then
                 log.error(text.install_fail)

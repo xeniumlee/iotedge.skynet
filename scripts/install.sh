@@ -3,7 +3,7 @@ set -e
 
 ROOT=$(dirname $0)/..
 LUA=${ROOT}/bin/prebuilt/lua
-RET=$(${LUA} ${ROOT}/scripts/configure.lua $@)
+RET=$(${LUA} ${ROOT}/scripts/configure.luac $@)
 
 install() {
     local UNIT_FILE=/etc/systemd/system/$2
@@ -26,10 +26,6 @@ start() {
     install ${ROOT}/sys/vpn/${VPN_SERVICE} ${VPN_SERVICE}
 
     systemctl daemon-reload
-    systemctl restart ${NODE_SERVICE}
-    systemctl restart ${VPN_SERVICE}
-    systemctl restart ${FRP_SERVICE}
-
     systemctl enable ${CORE_SERVICE}
     systemctl restart ${CORE_SERVICE}
 }

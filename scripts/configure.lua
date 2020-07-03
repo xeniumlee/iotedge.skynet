@@ -1,4 +1,4 @@
-package.path = "lualib/?.lua"
+package.path = "lualib/?.luac"
 package.cpath = "bin/prebuilt/?.so"
 
 local lfs = require "lfs"
@@ -40,11 +40,12 @@ local function copy(from, to)
     f:close()
 end
 
-local function init_sys(conf, host, id, port)
+local function init_sys(conf, config, host, id, port)
     local rev, platform = parse_platform()
     assert(rev and platform)
 
     local sys_conf = conf.sys
+    sys_conf.config = config
     sys_conf.release = rev
     sys_conf.platform = platform
     sys_conf.host = host
@@ -72,7 +73,7 @@ local function upgrade(config, from_dir, port)
     local c_conf = parse_config(file)
     assert(c_conf)
 
-    init_sys(c_conf, from_conf.sys.host, from_conf.sys.id, port)
+    init_sys(c_conf, config, from_conf.sys.host, from_conf.sys.id, port)
     init_mqtt(c_conf, from_conf.sysapp.mqtt and from_conf.sysapp.mqtt.conf or nil)
     save_config(c_conf)
 
@@ -90,7 +91,7 @@ local function install(config, host, mqtt_conf)
     local c_conf = parse_config(file)
     assert(c_conf)
 
-    init_sys(c_conf, host, mqtt_conf and mqtt_conf.id or nil)
+    init_sys(c_conf, config, host, mqtt_conf and mqtt_conf.id or nil)
     init_mqtt(c_conf, mqtt_conf)
     save_config(c_conf)
 end
