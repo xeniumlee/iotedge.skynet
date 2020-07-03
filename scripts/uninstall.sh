@@ -1,7 +1,10 @@
 #!/bin/sh
 set -e
 
-UNIT=iotedge.service
+ROOT=$(dirname $0)/..
+REVPLAT=$(cat ${ROOT}/PLATFORM)
+REV=${REVPLAT%-*}
+UNIT=iotedge-${REV}.service
 UNIT_FILE=/etc/systemd/system/${UNIT}
 
 systemctl disable ${UNIT}

@@ -214,30 +214,6 @@ local function start(cfg)
     end
 end
 
-local function stop()
-    --close_frp()
-    --peers = {}
-    --init_info(cfg)
-
-    local ok, err = sys.stop_svc(svc)
-    if ok then
-        log.info(err)
-    else
-        log.error(err)
-    end
-
-    ok, err = sys.disable_svc(svc)
-    if ok then
-        log.info(err)
-    else
-        log.error(err)
-    end
-
-    --os.remove(vpnini)
-
-    return ok
-end
-
 function open_peer(arg)
     if info.running then
         if type(arg) == "table" and
@@ -304,10 +280,6 @@ function on_conf(cfg)
     else
         return ok, text.invalid_conf
     end
-end
-
-function on_exit()
-    stop()
 end
 
 reg_cmd()

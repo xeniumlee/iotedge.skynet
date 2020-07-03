@@ -52,7 +52,6 @@ if [ -n "${PLAT}" ]; then
             --exclude=sproto.so \
             --exclude=client.so \
             --exclude=lib* \
-            --exclude=s7server \
             --exclude=*.lua \
             -czf ${TARBALL} ${DIRS} ${LUADIRS}
         find . -name "*.luac" |xargs rm -f
